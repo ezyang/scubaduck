@@ -19,6 +19,8 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     #filter_list { display: flex; flex-direction: column; }
+    th { text-align: left; cursor: pointer; }
+    th.sorted { color: blue; }
   </style>
 </head>
 <body>
@@ -135,23 +137,66 @@ function dive() {
     .then(showResults);
 }
 
-function showResults(data) {
-  window.lastResults = data;
+let originalRows = [];
+let sortState = {index: null, dir: null};
+
+function renderTable(rows) {
   const table = document.getElementById('results');
   table.innerHTML = '';
-  if (data.rows.length === 0) return;
+  if (rows.length === 0) return;
   const header = document.createElement('tr');
-  data.rows[0].forEach((_, i) => {
-    const th = document.createElement('th'); th.textContent = columns[i]; header.appendChild(th);
+  columns.forEach((col, i) => {
+    const th = document.createElement('th');
+    th.textContent = col;
+    th.dataset.index = i;
+    th.addEventListener('click', handleSort);
+    if (sortState.index === i) {
+      th.classList.add('sorted');
+      th.textContent = col + (sortState.dir === 'desc' ? ' \u25BC' : ' \u25B2');
+    }
+    header.appendChild(th);
   });
   table.appendChild(header);
-  data.rows.forEach(row => {
+  rows.forEach(row => {
     const tr = document.createElement('tr');
     row.forEach(v => {
       const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
     });
     table.appendChild(tr);
   });
+}
+
+function handleSort(e) {
+  const idx = parseInt(e.target.dataset.index, 10);
+  if (sortState.index !== idx) {
+    sortState.index = idx;
+    sortState.dir = 'desc';
+  } else if (sortState.dir === 'desc') {
+    sortState.dir = 'asc';
+  } else if (sortState.dir === 'asc') {
+    sortState.index = null;
+    sortState.dir = null;
+  } else {
+    sortState.dir = 'desc';
+  }
+  let rows = originalRows.slice();
+  if (sortState.index !== null) {
+    rows.sort((a, b) => {
+      const va = a[sortState.index];
+      const vb = b[sortState.index];
+      if (va === vb) return 0;
+      if (sortState.dir === 'desc') return va < vb ? 1 : -1;
+      return va > vb ? 1 : -1;
+    });
+  }
+  renderTable(rows);
+}
+
+function showResults(data) {
+  window.lastResults = data;
+  originalRows = data.rows.slice();
+  sortState = {index: null, dir: null};
+  renderTable(originalRows);
 }
 </script>
 </body>
