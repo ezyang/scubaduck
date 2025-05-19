@@ -123,3 +123,43 @@ def test_help_and_alignment(page: Any, server_url: str) -> None:
     assert text_align == 'right'
 
 
+def test_table_sorting(page: Any, server_url: str) -> None:
+    run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        order_dir="ASC",
+        limit=100,
+    )
+    # header alignment
+    align = page.evaluate("getComputedStyle(document.querySelector('#results th')).textAlign")
+    assert align == 'left'
+
+    header = page.locator('#results th').nth(3)
+    values = lambda: page.locator('#results td:nth-child(4)').all_inner_texts()
+
+    orig_rows = values()
+    assert orig_rows == ['alice', 'bob', 'alice', 'charlie']
+
+    first_sql = page.evaluate('window.lastResults.sql')
+
+    header.click()
+    assert values() == sorted(orig_rows, reverse=True)
+    assert header.inner_text().endswith('▼')
+    color = page.evaluate("getComputedStyle(document.querySelector('#results th:nth-child(4)')).color")
+    assert '0, 0, 255' in color
+    assert page.evaluate('window.lastResults.sql') == first_sql
+
+    header.click()
+    assert values() == sorted(orig_rows)
+    assert header.inner_text().endswith('▲')
+
+    header.click()
+    assert values() == orig_rows
+    assert header.inner_text() == 'user'
+    color = page.evaluate("getComputedStyle(document.querySelector('#results th:nth-child(4)')).color")
+    assert '0, 0, 255' not in color
+
+
