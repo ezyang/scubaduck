@@ -4,39 +4,67 @@
   <meta charset="utf-8">
   <title>ScubaDuck</title>
   <style>
-    body { display: flex; font-family: sans-serif; margin: 0; }
-    #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; }
-    #view { flex: 1; padding: 10px; }
-    .field { margin-bottom: 10px; }
+    body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
+    #header { padding: 10px; font-weight: bold; border-bottom: 1px solid #ccc; }
+    #content { flex: 1; display: flex; height: calc(100vh - 42px); overflow: hidden; }
+    #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; overflow-y: auto; display: flex; flex-direction: column; }
+    #view { flex: 1; padding: 10px; overflow-y: auto; }
+    .field { display: flex; align-items: center; margin-bottom: 10px; }
+    .field label { width: 80px; text-align: right; margin-right: 5px; }
+    .help { margin-left: 4px; cursor: help; }
+    #tabs { display: flex; align-items: center; margin-bottom: 10px; }
+    #tabs .tab { margin-right: 5px; background: none; border: 1px solid #ccc; padding: 4px 8px; cursor: pointer; }
+    #tabs .tab.active { background: #eee; font-weight: bold; }
+    #dive { margin-left: auto; background: green; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    #filter_list { display: flex; flex-direction: column; }
   </style>
 </head>
 <body>
-  <div id="sidebar">
-    <h3>Query</h3>
-    <div class="field">
-      <label>Start <input id="start" type="text" /></label>
+  <div id="header">sample.csv - events</div>
+  <div id="content">
+    <div id="sidebar">
+      <div id="tabs">
+        <button class="tab active" data-tab="settings">View Settings</button>
+        <button class="tab" data-tab="columns">Columns</button>
+        <button id="dive" onclick="dive()">Dive</button>
+      </div>
+      <div id="settings" class="tab-content active">
+        <div class="field">
+          <label>Start<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
+          <input id="start" type="text" />
+        </div>
+        <div class="field">
+          <label>End<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
+          <input id="end" type="text" />
+        </div>
+        <div class="field">
+          <label>Order By<span class="help" title="Choose a column to sort results by.">[?]</span></label>
+          <select id="order_by"></select>
+          <select id="order_dir">
+            <option value="ASC">ASC</option>
+            <option value="DESC">DESC</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Limit<span class="help" title="Choose the maximum number of results to show in the chart after any aggregations have been applied. For example, a limit of 10 will show no more than 10 rows for a table, etc.">[?]</span></label>
+          <input id="limit" type="number" value="100" />
+        </div>
+        <div id="filters" class="field">
+          <label>Filters<span class="help" title="You can create as many filters as you want. You can either write a filter using a UI or manual SQL. In the UI, filter consists of a column name, a relation (e.g., =, !=, <, >) and then a text field. The text field is a token input. It accepts multiple tokens for = relation, in which case we match using an OR for all options.">[?]</span></label>
+          <div id="filter_list">
+            <button type="button" onclick="addFilter()">Add Filter</button>
+          </div>
+        </div>
+      </div>
+      <div id="columns" class="tab-content">
+        <ul id="column_list"></ul>
+      </div>
     </div>
-    <div class="field">
-      <label>End <input id="end" type="text" /></label>
+    <div id="view">
+      <table id="results"></table>
     </div>
-    <div class="field">
-      <label>Order By <select id="order_by"></select>
-        <select id="order_dir">
-          <option value="ASC">ASC</option>
-          <option value="DESC">DESC</option>
-        </select>
-      </label>
-    </div>
-    <div class="field">
-      <label>Limit <input id="limit" type="number" value="100" /></label>
-    </div>
-    <div id="filters" class="field">
-      <button type="button" onclick="addFilter()">Add Filter</button>
-    </div>
-    <button onclick="dive()">Dive</button>
-  </div>
-  <div id="view">
-    <table id="results"></table>
   </div>
 <script>
 const columns = [];
@@ -48,6 +76,21 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     o.textContent = c.name;
     orderSelect.appendChild(o);
     columns.push(c.name);
+  });
+  const list = document.getElementById('column_list');
+  cols.forEach(c => {
+    const li = document.createElement('li');
+    li.textContent = c.name;
+    list.appendChild(li);
+  });
+});
+
+document.querySelectorAll('#tabs .tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
   });
 });
 
@@ -66,7 +109,7 @@ function addFilter() {
     <button type="button" onclick="this.parentElement.remove()">X</button>
   `;
   container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
-  document.getElementById('filters').appendChild(container);
+  document.getElementById('filter_list').appendChild(container);
 }
 
 function dive() {

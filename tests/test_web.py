@@ -85,3 +85,41 @@ def test_simple_filter(page: Any, server_url: str) -> None:
     assert len(data["rows"]) == 2
     assert all(row[3] == "alice" for row in data["rows"])
 
+
+def test_header_and_tabs(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+
+    header = page.text_content("#header")
+    assert "sample.csv" in header
+    assert "events" in header
+
+    assert page.is_visible("#settings")
+    assert page.is_hidden("#columns")
+    page.click("text=Columns")
+    assert page.is_visible("#columns")
+    cols = page.locator("#column_list li").all_inner_texts()
+    assert "timestamp" in cols
+    assert "event" in cols
+    page.click("text=View Settings")
+    assert page.is_visible("#settings")
+
+    btn_color = page.evaluate("getComputedStyle(document.querySelector('#dive')).backgroundColor")
+    assert "rgb(0, 128, 0)" == btn_color
+
+    sidebar_overflow = page.evaluate("getComputedStyle(document.querySelector('#sidebar')).overflowY")
+    view_overflow = page.evaluate("getComputedStyle(document.querySelector('#view')).overflowY")
+    assert sidebar_overflow == 'auto'
+    assert view_overflow == 'auto'
+
+
+def test_help_and_alignment(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    titles = page.evaluate("Array.from(document.querySelectorAll('#settings .help')).map(e => e.title)")
+    assert any('start/end of the time range' in t for t in titles)
+
+    text_align = page.evaluate("getComputedStyle(document.querySelector('#settings label')).textAlign")
+    assert text_align == 'right'
+
+
