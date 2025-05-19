@@ -16,7 +16,9 @@ def test_basic_query() -> None:
         "columns": ["timestamp", "event", "value", "user"],
         "filters": [],
     }
-    rv = client.post("/api/query", data=json.dumps(payload), content_type="application/json")
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
     data = rv.get_json()
     assert data
     rows = data["rows"]
@@ -35,11 +37,11 @@ def test_filter_multi_token() -> None:
         "order_by": "timestamp",
         "limit": 10,
         "columns": ["timestamp", "event", "value", "user"],
-        "filters": [
-            {"column": "user", "op": "=", "value": ["alice", "charlie"]}
-        ],
+        "filters": [{"column": "user", "op": "=", "value": ["alice", "charlie"]}],
     }
-    rv = client.post("/api/query", data=json.dumps(payload), content_type="application/json")
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
     data = rv.get_json()
     assert data
     rows = data["rows"]

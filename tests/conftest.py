@@ -20,4 +20,3 @@ def server_url() -> Iterator[str]:
     finally:
         httpd.shutdown()
         thread.join()
-

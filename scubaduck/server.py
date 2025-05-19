@@ -59,9 +59,7 @@ def build_query(params: QueryParams) -> str:
         where_parts.append(f"timestamp <= '{params.end}'")
     for f in params.filters:
         if f.op == "=" and isinstance(f.value, list):
-            vals = " OR ".join(
-                f"{f.column} = '{v}'" for v in f.value
-            )
+            vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
             where_parts.append(f"({vals})")
         else:
             val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)

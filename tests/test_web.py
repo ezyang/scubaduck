@@ -3,8 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 
-def run_query(page: Any, url: str, *, start: str | None = None, end: str | None = None,
-              order_by: str | None = None, order_dir: str | None = "ASC", limit: int | None = None) -> dict[str, Any]:
+def run_query(
+    page: Any,
+    url: str,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+    order_by: str | None = None,
+    order_dir: str | None = "ASC",
+    limit: int | None = None,
+) -> dict[str, Any]:
     page.goto(url)
     page.wait_for_selector("#order_by option", state="attached")
     if start is not None:
@@ -104,23 +112,33 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     page.click("text=View Settings")
     assert page.is_visible("#settings")
 
-    btn_color = page.evaluate("getComputedStyle(document.querySelector('#dive')).backgroundColor")
+    btn_color = page.evaluate(
+        "getComputedStyle(document.querySelector('#dive')).backgroundColor"
+    )
     assert "rgb(0, 128, 0)" == btn_color
 
-    sidebar_overflow = page.evaluate("getComputedStyle(document.querySelector('#sidebar')).overflowY")
-    view_overflow = page.evaluate("getComputedStyle(document.querySelector('#view')).overflowY")
-    assert sidebar_overflow == 'auto'
-    assert view_overflow == 'auto'
+    sidebar_overflow = page.evaluate(
+        "getComputedStyle(document.querySelector('#sidebar')).overflowY"
+    )
+    view_overflow = page.evaluate(
+        "getComputedStyle(document.querySelector('#view')).overflowY"
+    )
+    assert sidebar_overflow == "auto"
+    assert view_overflow == "auto"
 
 
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
-    titles = page.evaluate("Array.from(document.querySelectorAll('#settings .help')).map(e => e.title)")
-    assert any('start/end of the time range' in t for t in titles)
+    titles = page.evaluate(
+        "Array.from(document.querySelectorAll('#settings .help')).map(e => e.title)"
+    )
+    assert any("start/end of the time range" in t for t in titles)
 
-    text_align = page.evaluate("getComputedStyle(document.querySelector('#settings label')).textAlign")
-    assert text_align == 'right'
+    text_align = page.evaluate(
+        "getComputedStyle(document.querySelector('#settings label')).textAlign"
+    )
+    assert text_align == "right"
 
 
 def test_table_sorting(page: Any, server_url: str) -> None:
@@ -134,32 +152,36 @@ def test_table_sorting(page: Any, server_url: str) -> None:
         limit=100,
     )
     # header alignment
-    align = page.evaluate("getComputedStyle(document.querySelector('#results th')).textAlign")
-    assert align == 'left'
+    align = page.evaluate(
+        "getComputedStyle(document.querySelector('#results th')).textAlign"
+    )
+    assert align == "left"
 
-    header = page.locator('#results th').nth(3)
-    values = lambda: page.locator('#results td:nth-child(4)').all_inner_texts()
+    header = page.locator("#results th").nth(3)
+    values = lambda: page.locator("#results td:nth-child(4)").all_inner_texts()
 
     orig_rows = values()
-    assert orig_rows == ['alice', 'bob', 'alice', 'charlie']
+    assert orig_rows == ["alice", "bob", "alice", "charlie"]
 
-    first_sql = page.evaluate('window.lastResults.sql')
+    first_sql = page.evaluate("window.lastResults.sql")
 
     header.click()
     assert values() == sorted(orig_rows, reverse=True)
-    assert header.inner_text().endswith('▼')
-    color = page.evaluate("getComputedStyle(document.querySelector('#results th:nth-child(4)')).color")
-    assert '0, 0, 255' in color
-    assert page.evaluate('window.lastResults.sql') == first_sql
+    assert header.inner_text().endswith("▼")
+    color = page.evaluate(
+        "getComputedStyle(document.querySelector('#results th:nth-child(4)')).color"
+    )
+    assert "0, 0, 255" in color
+    assert page.evaluate("window.lastResults.sql") == first_sql
 
     header.click()
     assert values() == sorted(orig_rows)
-    assert header.inner_text().endswith('▲')
+    assert header.inner_text().endswith("▲")
 
     header.click()
     assert values() == orig_rows
-    assert header.inner_text() == 'user'
-    color = page.evaluate("getComputedStyle(document.querySelector('#results th:nth-child(4)')).color")
-    assert '0, 0, 255' not in color
-
-
+    assert header.inner_text() == "user"
+    color = page.evaluate(
+        "getComputedStyle(document.querySelector('#results th:nth-child(4)')).color"
+    )
+    assert "0, 0, 255" not in color
