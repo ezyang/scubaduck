@@ -10,3 +10,5 @@
 - There are no nested AGENTS.md files, this is the only agents file
 - When using Playwright, ONLY use chromium browser.  This browser is already
   installed.
+- Use "ruff check" to check lint, "ruff format" to autoformat files and
+  "pyright" to typecheck.
