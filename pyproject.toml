@@ -14,14 +14,6 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[dependency-groups]
-dev = [
-    "pytest>=8.3.5",
-    "ruff>=0.11.2",
-    "pytest-xdist>=3.6.1",
-    "pyright>=1.1.350",
-]
-
 [tool.pytest.ini_options]
 addopts = "-n auto --tb=native"
 
@@ -48,3 +40,11 @@ reportIncompatibleMethodOverride = true
 
 [tool.ruff]
 target-version = "py312"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.2",
+    "pytest-xdist>=3.6.1",
+    "pyright>=1.1.350",
+]
