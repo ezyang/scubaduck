@@ -20,7 +20,7 @@ addopts = "-n auto --tb=native"
 
 [tool.pyright]
 # Pyright configuration with strict settings
-include = ["scubaduck"]
+include = ["scubaduck", "tests"]
 exclude = ["**/__pycache__", "dist"]
 stubPath = "stubs"
 venvPath = "."

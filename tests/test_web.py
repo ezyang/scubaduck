@@ -4,7 +4,7 @@ from typing import Any
 
 
 def run_query(page: Any, url: str, *, start: str | None = None, end: str | None = None,
-              order_by: str | None = None, order_dir: str = "ASC", limit: int | None = None) -> dict[str, Any]:
+              order_by: str | None = None, order_dir: str | None = "ASC", limit: int | None = None) -> dict[str, Any]:
     page.goto(url)
     page.wait_for_selector("#order_by option", state="attached")
     if start is not None:
