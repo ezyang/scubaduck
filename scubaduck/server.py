@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import duckdb
 from flask import Flask, jsonify, request, send_from_directory
@@ -11,6 +11,11 @@ con = duckdb.connect()
 con.execute(
     "CREATE TABLE IF NOT EXISTS events AS SELECT * FROM read_csv_auto('scubaduck/sample.csv')"
 )
+
+# Cache column info and autocomplete results in memory
+COLUMN_INFO = con.execute("PRAGMA table_info(events)").fetchall()
+COLUMNS = [r[1] for r in COLUMN_INFO]
+autocomplete_cache: Dict[Tuple[str, str], List[str]] = {}
 
 
 @dataclass
@@ -39,8 +44,30 @@ def index() -> Any:
 
 @app.route("/api/columns")
 def columns() -> Any:
-    rows = con.execute("PRAGMA table_info(events)").fetchall()
-    return jsonify([{"name": r[1], "type": r[2]} for r in rows])
+    return jsonify([{"name": r[1], "type": r[2]} for r in COLUMN_INFO])
+
+
+def get_autocomplete(column: str, prefix: str) -> List[str]:
+    key = (column, prefix)
+    if key in autocomplete_cache:
+        return autocomplete_cache[key]
+    if column not in COLUMNS:
+        return []
+    sql = (
+        f"SELECT DISTINCT {column} FROM events WHERE CAST({column} AS TEXT) LIKE ? "
+        f"ORDER BY {column} LIMIT 10"
+    )
+    rows = con.execute(sql, [f"{prefix}%"]).fetchall()
+    values = [r[0] for r in rows]
+    autocomplete_cache[key] = values
+    return values
+
+
+@app.route("/api/autocomplete")
+def autocomplete() -> Any:
+    column = request.args.get("column", "")
+    prefix = request.args.get("prefix", "")
+    return jsonify(get_autocomplete(column, prefix))
 
 
 def build_query(params: QueryParams) -> str:

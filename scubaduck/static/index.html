@@ -9,6 +9,9 @@
     #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; }
     #view { flex: 1; padding: 10px; }
     .field { margin-bottom: 10px; }
+    .filter { border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; position: relative; }
+    .filter .remove { position: absolute; top: 5px; right: 5px; }
+    .filter select, .filter input { margin-right: 5px; }
   </style>
 </head>
 <body>
@@ -42,6 +45,7 @@
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
 const columns = [];
+const valueCache = {};
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
   cols.forEach(c => {
@@ -51,12 +55,14 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     orderSelect.appendChild(o);
     columns.push(c.name);
   });
+  addFilter();
 });
 
 function addFilter() {
   const container = document.createElement('div');
   container.className = 'filter';
   container.innerHTML = `
+    <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
     <select class="f-col"></select>
     <select class="f-op">
       <option value="=">=</option>
@@ -65,11 +71,21 @@ function addFilter() {
       <option value=">">></option>
     </select>
     <input class="f-val" type="text">
-    <button type="button" onclick="this.parentElement.remove()">X</button>
   `;
   container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
   document.getElementById('filters').appendChild(container);
-  new Choices(container.querySelector('.f-val'), { removeItemButton: true, duplicateItemsAllowed: false });
+  const input = container.querySelector('.f-val');
+  const chooser = new Choices(input, { removeItemButton: true, duplicateItemsAllowed: false });
+  input.addEventListener('keyup', () => {
+    const col = container.querySelector('.f-col').value;
+    const prefix = input.value;
+    const key = col + ':' + prefix;
+    const update = (vals) => chooser.setChoices(vals.map(v => ({ value: v, label: v })), 'value', 'label', true);
+    if (valueCache[key]) { update(valueCache[key]); return; }
+    fetch(`/api/autocomplete?column=${encodeURIComponent(col)}&prefix=${encodeURIComponent(prefix)}`)
+      .then(r => r.json())
+      .then(data => { valueCache[key] = data; update(data); });
+  });
 }
 
 function dive() {
