@@ -5,7 +5,10 @@ description = "Scuba on DuckDB"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
-dependencies = []
+dependencies = [
+    "duckdb",
+    "flask",
+]
 
 [build-system]
 requires = ["hatchling"]
