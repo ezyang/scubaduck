@@ -85,3 +85,53 @@ def test_simple_filter(page: Any, server_url: str) -> None:
     assert len(data["rows"]) == 2
     assert all(row[3] == "alice" for row in data["rows"])
 
+
+def test_local_sorting(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        limit=100,
+    )
+    # Initial unsorted table matches server results
+    cell_values = page.eval_on_selector_all(
+        "#results td:nth-child(1)", "els => els.map(e => e.textContent)"
+    )
+    assert cell_values == [row[0] for row in data["rows"]]
+
+    header_selector = "#results th:nth-child(3)"
+    header = page.query_selector(header_selector)
+    assert header and header.text_content() == "value"
+
+    # Click to sort descending
+    header.click()
+    page.wait_for_timeout(100)
+    header = page.query_selector(header_selector)
+    assert header.text_content().endswith("\u2193")
+    values = page.eval_on_selector_all(
+        "#results td:nth-child(3)", "els => els.map(e => parseInt(e.textContent))"
+    )
+    assert values == sorted(values, reverse=True)
+
+    # Click to sort ascending
+    header.click()
+    page.wait_for_timeout(100)
+    header = page.query_selector(header_selector)
+    assert header.text_content().endswith("\u2191")
+    values = page.eval_on_selector_all(
+        "#results td:nth-child(3)", "els => els.map(e => parseInt(e.textContent))"
+    )
+    assert values == sorted(values)
+
+    # Click again to remove sorting
+    header.click()
+    page.wait_for_timeout(100)
+    header = page.query_selector(header_selector)
+    assert header.text_content() == "value"
+    cell_values = page.eval_on_selector_all(
+        "#results td:nth-child(1)", "els => els.map(e => e.textContent)"
+    )
+    assert cell_values == [row[0] for row in data["rows"]]
+

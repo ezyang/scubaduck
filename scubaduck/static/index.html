@@ -8,6 +8,8 @@
     #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; }
     #view { flex: 1; padding: 10px; }
     .field { margin-bottom: 10px; }
+    th { text-align: left; cursor: pointer; }
+    th.sorted { color: blue; }
   </style>
 </head>
 <body>
@@ -50,6 +52,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     columns.push(c.name);
   });
 });
+
+let originalRows = [];
+let sortState = {index: null, dir: 0}; // dir: 0 none, 1 desc, 2 asc
 
 function addFilter() {
   const container = document.createElement('div');
@@ -94,15 +99,50 @@ function dive() {
 
 function showResults(data) {
   window.lastResults = data;
+  originalRows = data.rows.slice();
+  sortState = {index: null, dir: 0};
+  renderTable();
+}
+
+function renderTable() {
   const table = document.getElementById('results');
   table.innerHTML = '';
-  if (data.rows.length === 0) return;
+  if (originalRows.length === 0) return;
   const header = document.createElement('tr');
-  data.rows[0].forEach((_, i) => {
-    const th = document.createElement('th'); th.textContent = columns[i]; header.appendChild(th);
+  originalRows[0].forEach((_, i) => {
+    const th = document.createElement('th');
+    th.textContent = columns[i];
+    th.onclick = () => {
+      if (sortState.index !== i) {
+        sortState.index = i;
+        sortState.dir = 1; // descending first
+      } else {
+        sortState.dir = (sortState.dir + 1) % 3;
+        if (sortState.dir === 0) sortState.index = null;
+      }
+      renderTable();
+    };
+    if (sortState.index === i && sortState.dir !== 0) {
+      th.classList.add('sorted');
+      th.textContent += sortState.dir === 1 ? ' \u2193' : ' \u2191';
+    }
+    header.appendChild(th);
   });
   table.appendChild(header);
-  data.rows.forEach(row => {
+  let rows = originalRows.slice();
+  if (sortState.dir !== 0 && sortState.index !== null) {
+    const idx = sortState.index;
+    rows.sort((a, b) => {
+      let av = a[idx];
+      let bv = b[idx];
+      const na = parseFloat(av);
+      const nb = parseFloat(bv);
+      if (!isNaN(na) && !isNaN(nb)) { av = na; bv = nb; }
+      if (av === bv) return 0;
+      return (av < bv ? -1 : 1) * (sortState.dir === 1 ? -1 : 1);
+    });
+  }
+  rows.forEach(row => {
     const tr = document.createElement('tr');
     row.forEach(v => {
       const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
