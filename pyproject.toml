@@ -18,27 +18,6 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 addopts = "-n auto --tb=native"
 
-[tool.pyright]
-# Pyright configuration with strict settings
-include = ["scubaduck"]
-exclude = ["**/__pycache__", "dist"]
-stubPath = "stubs"
-venvPath = "."
-venv = ".venv"
-reportMissingImports = true
-reportMissingTypeStubs = true
-pythonVersion = "3.12"
-pythonPlatform = "All"
-typeCheckingMode = "strict"
-reportUnknownMemberType = true
-reportUnknownParameterType = true
-reportUnknownVariableType = true
-reportUnknownArgumentType = true
-reportPrivateImportUsage = true
-reportUntypedFunctionDecorator = true
-reportFunctionMemberAccess = true
-reportIncompatibleMethodOverride = true
-
 [tool.ruff]
 target-version = "py312"
 
@@ -47,5 +26,4 @@ dev-dependencies = [
     "pytest>=8.3.5",
     "ruff>=0.11.2",
     "pytest-xdist>=3.6.1",
-    "pyright>=1.1.350",
 ]
