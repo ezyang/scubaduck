@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <title>ScubaDuck</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <style>
     body { display: flex; font-family: sans-serif; margin: 0; }
     #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; }
@@ -39,7 +38,6 @@
   <div id="view">
     <table id="results"></table>
   </div>
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
 const columns = [];
 fetch('/api/columns').then(r => r.json()).then(cols => {
@@ -69,7 +67,6 @@ function addFilter() {
   `;
   container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
   document.getElementById('filters').appendChild(container);
-  new Choices(container.querySelector('.f-val'), { removeItemButton: true, duplicateItemsAllowed: false });
 }
 
 function dive() {
@@ -82,9 +79,13 @@ function dive() {
     columns
   };
   payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
-    const valInput = f.querySelector('.f-val')._choices;
-    const values = valInput.getValue(true);
-    return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value: values.length > 1 ? values : values[0]};
+    const raw = f.querySelector('.f-val').value.trim();
+    if (raw === '') {
+      return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value: null};
+    }
+    const parts = raw.split(/\s+/);
+    const value = parts.length > 1 ? parts : parts[0];
+    return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value};
   });
   fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(r=>r.json())

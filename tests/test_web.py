@@ -67,3 +67,21 @@ def test_limit(page: Any, server_url: str) -> None:
     )
     assert len(data["rows"]) == 2
 
+
+def test_simple_filter(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    filter_el = page.query_selector("#filters .filter:last-child")
+    assert filter_el
+    filter_el.query_selector(".f-col").select_option("user")
+    val_input = filter_el.query_selector(".f-val")
+    val_input.click()
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert len(data["rows"]) == 2
+    assert all(row[3] == "alice" for row in data["rows"])
+
