@@ -1,1 +1,1 @@
-(intentionally blank)
+- ONLY use non-interactive commands like cat, sed, apply_patch to do edits.  Do NOT use interactive editors.
