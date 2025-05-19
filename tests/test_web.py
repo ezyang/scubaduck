@@ -158,7 +158,10 @@ def test_table_sorting(page: Any, server_url: str) -> None:
     assert align == "left"
 
     header = page.locator("#results th").nth(3)
-    values = lambda: page.locator("#results td:nth-child(4)").all_inner_texts()
+
+    def values():
+        """Return the values from the fourth column."""
+        return page.locator("#results td:nth-child(4)").all_inner_texts()
 
     orig_rows = values()
     assert orig_rows == ["alice", "bob", "alice", "charlie"]
