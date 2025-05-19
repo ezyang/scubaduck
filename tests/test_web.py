@@ -17,6 +17,7 @@ def run_query(page: Any, url: str, *, start: str | None = None, end: str | None 
         page.select_option("#order_dir", order_dir)
     if limit is not None:
         page.fill("#limit", str(limit))
+    page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
     return page.evaluate("window.lastResults")
