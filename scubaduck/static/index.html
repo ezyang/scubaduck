@@ -92,6 +92,7 @@ function dive() {
 }
 
 function showResults(data) {
+  window.lastResults = data;
   const table = document.getElementById('results');
   table.innerHTML = '';
   if (data.rows.length === 0) return;
