@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ScubaDuck</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <style>
+    body { display: flex; font-family: sans-serif; margin: 0; }
+    #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; }
+    #view { flex: 1; padding: 10px; }
+    .field { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>Query</h3>
+    <div class="field">
+      <label>Start <input id="start" type="text" /></label>
+    </div>
+    <div class="field">
+      <label>End <input id="end" type="text" /></label>
+    </div>
+    <div class="field">
+      <label>Order By <select id="order_by"></select>
+        <select id="order_dir">
+          <option value="ASC">ASC</option>
+          <option value="DESC">DESC</option>
+        </select>
+      </label>
+    </div>
+    <div class="field">
+      <label>Limit <input id="limit" type="number" value="100" /></label>
+    </div>
+    <div id="filters" class="field">
+      <button type="button" onclick="addFilter()">Add Filter</button>
+    </div>
+    <button onclick="dive()">Dive</button>
+  </div>
+  <div id="view">
+    <table id="results"></table>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script>
+const columns = [];
+fetch('/api/columns').then(r => r.json()).then(cols => {
+  const orderSelect = document.getElementById('order_by');
+  cols.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.name;
+    o.textContent = c.name;
+    orderSelect.appendChild(o);
+    columns.push(c.name);
+  });
+});
+
+function addFilter() {
+  const container = document.createElement('div');
+  container.className = 'filter';
+  container.innerHTML = `
+    <select class="f-col"></select>
+    <select class="f-op">
+      <option value="=">=</option>
+      <option value="!=">!=</option>
+      <option value="<"><</option>
+      <option value=">">></option>
+    </select>
+    <input class="f-val" type="text">
+    <button type="button" onclick="this.parentElement.remove()">X</button>
+  `;
+  container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('filters').appendChild(container);
+  new Choices(container.querySelector('.f-val'), { removeItemButton: true, duplicateItemsAllowed: false });
+}
+
+function dive() {
+  const payload = {
+    start: document.getElementById('start').value,
+    end: document.getElementById('end').value,
+    order_by: document.getElementById('order_by').value,
+    order_dir: document.getElementById('order_dir').value,
+    limit: parseInt(document.getElementById('limit').value, 10),
+    columns
+  };
+  payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
+    const valInput = f.querySelector('.f-val')._choices;
+    const values = valInput.getValue(true);
+    return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value: values.length > 1 ? values : values[0]};
+  });
+  fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(r=>r.json())
+    .then(showResults);
+}
+
+function showResults(data) {
+  const table = document.getElementById('results');
+  table.innerHTML = '';
+  if (data.rows.length === 0) return;
+  const header = document.createElement('tr');
+  data.rows[0].forEach((_, i) => {
+    const th = document.createElement('th'); th.textContent = columns[i]; header.appendChild(th);
+  });
+  table.appendChild(header);
+  data.rows.forEach(row => {
+    const tr = document.createElement('tr');
+    row.forEach(v => {
+      const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
