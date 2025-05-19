@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 import duckdb
 from flask import Flask, jsonify, request, send_from_directory
@@ -17,7 +19,7 @@ con.execute(
 class Filter:
     column: str
     op: str
-    value: Any
+    value: str | int | float | list[str] | None
 
 
 @dataclass
@@ -27,13 +29,14 @@ class QueryParams:
     order_by: str | None = None
     order_dir: str = "ASC"
     limit: int | None = None
-    columns: List[str] = field(default_factory=list)
-    filters: List[Filter] = field(default_factory=list)
-    derived_columns: Dict[str, str] = field(default_factory=dict)
+    columns: list[str] = field(default_factory=lambda: [])
+    filters: list[Filter] = field(default_factory=lambda: [])
+    derived_columns: dict[str, str] = field(default_factory=lambda: {})
 
 
 @app.route("/")
 def index() -> Any:
+    assert app.static_folder is not None
     return send_from_directory(app.static_folder, "index.html")
 
 
@@ -49,14 +52,16 @@ def build_query(params: QueryParams) -> str:
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
     query = f"SELECT {select_clause} FROM events"
-    where_parts = []
+    where_parts: list[str] = []
     if params.start:
         where_parts.append(f"timestamp >= '{params.start}'")
     if params.end:
         where_parts.append(f"timestamp <= '{params.end}'")
     for f in params.filters:
         if f.op == "=" and isinstance(f.value, list):
-            vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
+            vals = " OR ".join(
+                f"{f.column} = '{v}'" for v in f.value
+            )
             where_parts.append(f"({vals})")
         else:
             val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
