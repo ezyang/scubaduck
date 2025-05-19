@@ -20,5 +20,7 @@ jobs:
           playwright install chromium
       - name: Ruff
         run: ruff check .
+      - name: Pyright
+        run: pyright
       - name: Pytest
         run: pytest -n auto
