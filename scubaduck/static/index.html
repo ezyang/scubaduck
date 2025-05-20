@@ -98,6 +98,7 @@
         <div id="query_info" style="margin-top:10px;"></div>
       </div>
       <div id="columns" class="tab-content">
+        <button id="toggle_columns" type="button">All/None</button>
         <ul id="column_list"></ul>
       </div>
     </div>
@@ -106,7 +107,8 @@
     </div>
   </div>
 <script>
-const columns = [];
+const allColumns = [];
+let selectedColumns = [];
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
 function updateOrderDirButton() {
@@ -124,14 +126,23 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     o.value = c.name;
     o.textContent = c.name;
     orderSelect.appendChild(o);
-    columns.push(c.name);
+    allColumns.push(c.name);
   });
   const list = document.getElementById('column_list');
   cols.forEach(c => {
     const li = document.createElement('li');
-    li.textContent = c.name;
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = c.name;
+    cb.checked = true;
+    cb.addEventListener('change', updateSelectedColumns);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + c.name));
+    li.appendChild(label);
     list.appendChild(li);
   });
+  updateSelectedColumns();
   addFilter();
 });
 
@@ -158,6 +169,23 @@ document.querySelectorAll('.rel-select').forEach(sel => {
   });
 });
 
+function updateSelectedColumns() {
+  selectedColumns = Array.from(
+    document.querySelectorAll('#column_list input[type=checkbox]')
+  )
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+}
+
+document.getElementById('toggle_columns').addEventListener('click', () => {
+  const boxes = document.querySelectorAll('#column_list input[type=checkbox]');
+  const allChecked = Array.from(boxes).every(cb => cb.checked);
+  boxes.forEach(cb => {
+    cb.checked = !allChecked;
+  });
+  updateSelectedColumns();
+});
+
 function addFilter() {
   const container = document.createElement('div');
   container.className = 'filter';
@@ -174,7 +202,7 @@ function addFilter() {
     <input class="f-val" type="text">
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
-  container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
+  container.querySelector('.f-col').innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
   document.getElementById('filter_list').appendChild(container);
 }
 
@@ -182,13 +210,14 @@ let lastQueryTime = 0;
 let queryStart = 0;
 
 function dive() {
+  updateSelectedColumns();
   const payload = {
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
-    columns
+    columns: selectedColumns
   };
   payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
     const raw = f.querySelector('.f-val').value.trim();
@@ -218,7 +247,7 @@ function renderTable(rows) {
   table.innerHTML = '';
   if (rows.length === 0) return;
   const header = document.createElement('tr');
-  columns.forEach((col, i) => {
+  selectedColumns.forEach((col, i) => {
     const th = document.createElement('th');
     th.textContent = col;
     th.dataset.index = i;

@@ -122,7 +122,7 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     assert page.is_hidden("#columns")
     page.click("text=Columns")
     assert page.is_visible("#columns")
-    cols = page.locator("#column_list li").all_inner_texts()
+    cols = [c.strip() for c in page.locator("#column_list li").all_inner_texts()]
     assert "timestamp" in cols
     assert "event" in cols
     page.click("text=View Settings")
@@ -213,3 +213,40 @@ def test_relative_dropdown(page: Any, server_url: str) -> None:
     btn.click()
     page.select_option("#start-select", "-3 hours")
     assert page.input_value("#start") == "-3 hours"
+
+
+def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_list input", state="attached")
+
+    count = page.evaluate(
+        "document.querySelectorAll('#column_list input:checked').length"
+    )
+    assert count == 4
+
+    page.click("#toggle_columns")
+    count = page.evaluate(
+        "document.querySelectorAll('#column_list input:checked').length"
+    )
+    assert count == 0
+    page.click("#toggle_columns")
+    count = page.evaluate(
+        "document.querySelectorAll('#column_list input:checked').length"
+    )
+    assert count == 4
+
+    page.uncheck("#column_list input[value='value']")
+    page.click("text=View Settings")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-02 00:00:00")
+    page.select_option("#order_by", "timestamp")
+    page.fill("#limit", "10")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert len(data["rows"][0]) == 3
+    headers = page.locator("#results th").all_inner_texts()
+    assert "value" not in headers
