@@ -355,6 +355,12 @@ function initChipInput(filter) {
 
   input.addEventListener('focus', loadOptions);
   input.addEventListener('input', loadOptions);
+
+  document.addEventListener('click', evt => {
+    if (!filter.contains(evt.target)) {
+      hideDropdown();
+    }
+  });
 }
 
 function addFilter() {
