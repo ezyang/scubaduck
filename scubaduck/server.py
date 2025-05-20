@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Dict, Tuple, List
+
+import time
 
 import duckdb
 from flask import Flask, jsonify, request, send_from_directory
@@ -13,6 +15,9 @@ con = duckdb.connect()
 con.execute(
     "CREATE TABLE IF NOT EXISTS events AS SELECT * FROM read_csv_auto('scubaduck/sample.csv')"
 )
+_column_types: Dict[str, str] = {
+    r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
+}
 
 
 @dataclass
@@ -44,6 +49,53 @@ def index() -> Any:
 def columns() -> Any:
     rows = con.execute("PRAGMA table_info(events)").fetchall()
     return jsonify([{"name": r[1], "type": r[2]} for r in rows])
+
+
+# Simple in-memory LRU cache for sample value queries
+_SAMPLE_CACHE: Dict[Tuple[str, str], Tuple[List[str], float]] = {}
+_CACHE_TTL = 60.0
+_CACHE_LIMIT = 200
+
+
+def _cache_get(key: Tuple[str, str]) -> List[str] | None:
+    item = _SAMPLE_CACHE.get(key)
+    if item is None:
+        return None
+    vals, ts = item
+    if time.time() - ts > _CACHE_TTL:
+        del _SAMPLE_CACHE[key]
+        return None
+    _SAMPLE_CACHE[key] = (vals, time.time())
+    return vals
+
+
+def _cache_set(key: Tuple[str, str], vals: List[str]) -> None:
+    _SAMPLE_CACHE[key] = (vals, time.time())
+    if len(_SAMPLE_CACHE) > _CACHE_LIMIT:
+        oldest = min(_SAMPLE_CACHE.items(), key=lambda kv: kv[1][1])[0]
+        del _SAMPLE_CACHE[oldest]
+
+
+@app.route("/api/samples")
+def sample_values() -> Any:
+    column = request.args.get("column")
+    substr = request.args.get("q", "")
+    if not column or column not in _column_types:
+        return jsonify([])
+    ctype = _column_types[column].upper()
+    if "CHAR" not in ctype and "STRING" not in ctype and "VARCHAR" not in ctype:
+        return jsonify([])
+    key = (column, substr)
+    cached = _cache_get(key)
+    if cached is not None:
+        return jsonify(cached)
+    rows = con.execute(
+        f"SELECT DISTINCT {column} FROM events WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
+        [substr],
+    ).fetchall()
+    values = [r[0] for r in rows]
+    _cache_set(key, values)
+    return jsonify(values)
 
 
 def build_query(params: QueryParams) -> str:

@@ -250,3 +250,69 @@ def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
     assert len(data["rows"][0]) == 3
     headers = page.locator("#results th").all_inner_texts()
     assert "value" not in headers
+
+
+def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    f.query_selector(".f-col").select_option("user")
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
+    page.keyboard.type("ali")
+    page.wait_for_selector("text=alice")
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("Enter")
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips == ["ali"]
+    page.click("#filters .filter:last-child .chip .x")
+    page.wait_for_selector(".chip", state="detached")
+
+
+def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.evaluate(
+        "Object.defineProperty(navigator, 'clipboard', {value:{ _data: '', writeText(t){ this._data = t; }, readText(){ return Promise.resolve(this._data); } }})"
+    )
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    f.query_selector(".f-col").select_option("user")
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    page.keyboard.type("bob")
+    page.keyboard.press("Enter")
+    f.query_selector(".chip-copy").click()
+    assert page.evaluate("navigator.clipboard._data") == "alice,bob"
+    page.evaluate(
+        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelector('.chips').innerHTML=''"
+    )
+    page.wait_for_selector("#filters .chip", state="detached")
+    inp.click()
+    page.evaluate(
+        "var dt=new DataTransfer(); dt.setData('text/plain','alice,bob'); var e=new ClipboardEvent('paste',{clipboardData:dt}); document.querySelector('#filters .filter:last-child .f-val').dispatchEvent(e);"
+    )
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips[:2] == ["alice", "bob"]
+    page.evaluate(
+        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelector('.chips').innerHTML=''"
+    )
+    page.wait_for_selector("#filters .chip", state="detached")
+    inp.click()
+    page.evaluate(
+        "var dt=new DataTransfer(); dt.setData('text/plain','alice,bob'); var e=new ClipboardEvent('paste',{clipboardData:dt}); Object.defineProperty(e,'shiftKey',{value:true}); document.querySelector('#filters .filter:last-child .f-val').dispatchEvent(e);"
+    )
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips[-1] == "alice,bob"
