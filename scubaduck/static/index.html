@@ -32,7 +32,12 @@
     #filters .filter-row { display: flex; margin-bottom: 5px; }
     #filters .filter-row .f-col { flex: 1; }
     #filters .filter-row .f-op { width: 60px; margin-left: 5px; }
-    #filters .filter input.f-val { border: none; flex: 1; min-width: 60px; }
+    #filters .filter input.f-val {
+      border: none;
+      flex: 1;
+      min-width: 60px;
+      margin: 2px;
+    }
     #filters .filter .chip-box { position: relative; }
     #filters .chip-input { display: flex; flex-wrap: wrap; border: 1px solid #ccc; padding: 2px; min-height: 24px; }
     #filters .chip { background: #eee; border: 1px solid #999; padding: 2px 4px; margin: 2px; border-radius: 3px; display: flex; align-items: center; }
@@ -203,7 +208,7 @@ function isStringColumn(name) {
 
 function initChipInput(filter) {
   const input = filter.querySelector('.f-val');
-  const chipsEl = filter.querySelector('.chips');
+  const chipsEl = filter.querySelector('.chip-input');
   const dropdown = filter.querySelector('.chip-dropdown');
   const copyBtn = filter.querySelector('.chip-copy');
   const chips = [];
@@ -211,23 +216,27 @@ function initChipInput(filter) {
   let options = [];
   let highlight = 0;
 
-  function renderChips() {
-    chipsEl.innerHTML = '';
-    chips.forEach((v, i) => {
-      const span = document.createElement('span');
-      span.className = 'chip';
-      span.textContent = v;
-      const x = document.createElement('span');
-      x.className = 'x';
-      x.textContent = 'x';
-      x.addEventListener('click', () => {
-        chips.splice(i, 1);
-        renderChips();
+  chipsEl.addEventListener('click', () => {
+    input.focus();
+  });
+
+    function renderChips() {
+      chipsEl.querySelectorAll('.chip').forEach(c => c.remove());
+      chips.forEach((v, i) => {
+        const span = document.createElement('span');
+        span.className = 'chip';
+        span.textContent = v;
+        const x = document.createElement('span');
+        x.className = 'x';
+        x.textContent = 'x';
+        x.addEventListener('click', () => {
+          chips.splice(i, 1);
+          renderChips();
+        });
+        span.appendChild(x);
+        chipsEl.insertBefore(span, input);
       });
-      span.appendChild(x);
-      chipsEl.appendChild(span);
-    });
-  }
+    }
 
   function hideDropdown() {
     dropdown.style.display = 'none';
@@ -278,11 +287,20 @@ function initChipInput(filter) {
         updateHighlight();
       }
       e.preventDefault();
+    } else if (e.key === 'Backspace' && input.value === '') {
+      if (chips.length > 0) {
+        chips.pop();
+        renderChips();
+      }
+      hideDropdown();
     } else if (e.key === 'Enter') {
       if (dropdown.style.display !== 'none' && dropdown.children.length > 0) {
         const val = dropdown.children[highlight].dataset.value;
-        addChip(val);
-        hideDropdown();
+        if (val !== input.value.trim()) {
+          addChip(val);
+        } else {
+          addChip(input.value.trim());
+        }
       } else {
         addChip(input.value.trim());
       }
@@ -354,7 +372,6 @@ function addFilter() {
     </div>
     <div class="chip-box">
       <div class="chip-input">
-        <div class="chips"></div>
         <input class="f-val" type="text">
         <button type="button" class="chip-copy">\u2398</button>
       </div>
