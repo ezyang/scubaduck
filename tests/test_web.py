@@ -493,3 +493,17 @@ def test_load_from_url(page: Any, server_url: str) -> None:
     assert page.input_value("#end") == "2024-01-02 00:00:00"
     assert page.input_value("#limit") == "2"
     assert page.evaluate("window.lastResults.rows.length") == 2
+
+
+def test_empty_data_message(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="2025-01-01 00:00:00",
+        end="2025-01-02 00:00:00",
+        order_by="timestamp",
+        limit=100,
+    )
+    assert data["rows"] == []
+    msg = page.text_content("#view")
+    assert "Empty data provided to table" in msg

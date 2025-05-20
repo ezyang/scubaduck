@@ -862,7 +862,12 @@ function handleSort(e) {
 function showResults(data) {
   window.lastResults = data;
   const view = document.getElementById('view');
-  view.innerHTML = '<table id="results"></table>';
+  if (data.rows.length === 0) {
+    view.innerHTML =
+      '<p id="empty-message">Empty data provided to table</p><table id="results"></table>';
+  } else {
+    view.innerHTML = '<table id="results"></table>';
+  }
   originalRows = data.rows.slice();
   sortState = {index: null, dir: null};
   renderTable(originalRows);
