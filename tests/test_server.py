@@ -76,3 +76,23 @@ def test_empty_filter_is_noop() -> None:
     rows1 = rv1.get_json()["rows"]
     rows2 = rv2.get_json()["rows"]
     assert rows1 == rows2
+
+
+def test_subset_columns() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-02 00:00:00",
+        "order_by": "timestamp",
+        "limit": 10,
+        "columns": ["timestamp", "event"],
+        "filters": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert rows
+    # Only two columns requested
+    assert len(rows[0]) == 2

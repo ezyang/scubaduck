@@ -90,6 +90,7 @@
         <div id="query_info" style="margin-top:10px;"></div>
       </div>
       <div id="columns" class="tab-content">
+        <button id="column_toggle" type="button">All/None</button>
         <ul id="column_list"></ul>
       </div>
     </div>
@@ -98,7 +99,8 @@
     </div>
   </div>
 <script>
-const columns = [];
+const allColumns = [];
+let columns = [];
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
   cols.forEach(c => {
@@ -106,15 +108,22 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     o.value = c.name;
     o.textContent = c.name;
     orderSelect.appendChild(o);
-    columns.push(c.name);
+    allColumns.push(c.name);
   });
+  columns = allColumns.slice();
   const list = document.getElementById('column_list');
   cols.forEach(c => {
     const li = document.createElement('li');
-    li.textContent = c.name;
+    li.innerHTML = `<label><input type="checkbox" value="${c.name}" checked> ${c.name}</label>`;
     list.appendChild(li);
   });
   addFilter();
+});
+
+document.getElementById('column_toggle').addEventListener('click', () => {
+  const boxes = document.querySelectorAll('#column_list input[type="checkbox"]');
+  const allChecked = Array.from(boxes).every(b => b.checked);
+  boxes.forEach(b => { b.checked = !allChecked; });
 });
 
 document.querySelectorAll('#tabs .tab').forEach(btn => {
@@ -154,7 +163,7 @@ function addFilter() {
     <input class="f-val" type="text">
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
-  container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
+  container.querySelector('.f-col').innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
   document.getElementById('filter_list').appendChild(container);
 }
 
@@ -162,6 +171,9 @@ let lastQueryTime = 0;
 let queryStart = 0;
 
 function dive() {
+  columns = Array.from(document.querySelectorAll('#column_list input[type="checkbox"]'))
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
   const payload = {
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,

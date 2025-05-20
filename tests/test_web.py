@@ -121,7 +121,7 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     assert page.is_hidden("#columns")
     page.click("text=Columns")
     assert page.is_visible("#columns")
-    cols = page.locator("#column_list li").all_inner_texts()
+    cols = [c.strip() for c in page.locator("#column_list li").all_inner_texts()]
     assert "timestamp" in cols
     assert "event" in cols
     page.click("text=View Settings")
@@ -212,3 +212,36 @@ def test_relative_dropdown(page: Any, server_url: str) -> None:
     btn.click()
     page.select_option("#start-select", "-3 hours")
     assert page.input_value("#start") == "-3 hours"
+
+
+def test_column_checkboxes_and_toggle(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+
+    # all checkboxes selected by default
+    assert page.evaluate(
+        "Array.from(document.querySelectorAll('#column_list input')).every(c => c.checked)"
+    )
+
+    # toggle to none
+    page.click("#column_toggle")
+    assert page.evaluate(
+        "Array.from(document.querySelectorAll('#column_list input')).every(c => !c.checked)"
+    )
+
+    # toggle back to all
+    page.click("#column_toggle")
+    assert page.evaluate(
+        "Array.from(document.querySelectorAll('#column_list input')).every(c => c.checked)"
+    )
+
+    # uncheck value column and run query
+    page.uncheck('#column_list input[value="value"]')
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert len(data["rows"][0]) == 3
+    headers = page.locator("#results th").all_inner_texts()
+    assert "value" not in headers
