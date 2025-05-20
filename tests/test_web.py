@@ -275,6 +275,17 @@ def test_column_group_links(page: Any, server_url: str) -> None:
     assert tag == "A"
 
 
+def test_column_group_links_float_right(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups .col-group .links", state="attached")
+    float_val = page.evaluate(
+        "getComputedStyle(document.querySelector('#column_groups .col-group .links')).float"
+    )
+    assert float_val == "right"
+
+
 def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
