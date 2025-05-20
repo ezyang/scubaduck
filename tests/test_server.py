@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+import duckdb
 from scubaduck import server
 
 
@@ -136,3 +139,54 @@ def test_string_filter_ops() -> None:
         "/api/query", data=json.dumps(not_empty), content_type="application/json"
     )
     assert len(rv.get_json()["rows"]) == 4
+
+
+def _make_payload() -> dict[str, object]:
+    return {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-02 00:00:00",
+        "order_by": "timestamp",
+        "order_dir": "ASC",
+        "limit": 10,
+        "columns": ["timestamp", "event", "value", "user"],
+        "filters": [],
+    }
+
+
+def test_database_types(tmp_path: Path) -> None:
+    csv_file = tmp_path / "events.csv"
+    csv_file.write_text(Path("scubaduck/sample.csv").read_text())
+
+    sqlite_file = tmp_path / "events.sqlite"
+    import sqlite3
+
+    conn = sqlite3.connect(sqlite_file)
+    conn.execute(
+        "CREATE TABLE events (timestamp TEXT, event TEXT, value INTEGER, user TEXT)"
+    )
+    with open(csv_file) as f:
+        next(f)
+        for line in f:
+            ts, ev, val, user = line.strip().split(",")
+            conn.execute(
+                "INSERT INTO events VALUES (?, ?, ?, ?)", (ts, ev, int(val), user)
+            )
+    conn.commit()
+    conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    duckdb_file = tmp_path / "events.duckdb"
+    con = duckdb.connect(duckdb_file)
+    con.execute(
+        f"CREATE TABLE events AS SELECT * FROM read_csv_auto('{csv_file.as_posix()}')"
+    )
+    con.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    for db in (csv_file, sqlite_file, duckdb_file):
+        app = server.create_app(db)
+        client = app.test_client()
+        payload = _make_payload()
+        rv = client.post(
+            "/api/query", data=json.dumps(payload), content_type="application/json"
+        )
+        rows = rv.get_json()["rows"]
+        assert len(rows) == 3
