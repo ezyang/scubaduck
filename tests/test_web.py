@@ -265,6 +265,15 @@ def test_columns_links_alignment(page: Any, server_url: str) -> None:
     assert align == "right"
 
 
+def test_column_group_links(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups a", state="attached")
+    tag = page.evaluate("document.querySelector('#column_groups .col-group a').tagName")
+    assert tag == "A"
+
+
 def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

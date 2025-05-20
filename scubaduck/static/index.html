@@ -72,6 +72,9 @@
     #column_actions a {
       margin-left: 5px;
     }
+    .col-group a {
+      margin-left: 5px;
+    }
     /* Column resizer removed */
   </style>
 </head>
@@ -216,11 +219,11 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     div.className = 'col-group';
     const header = document.createElement('div');
     header.textContent = g.name + ': ';
-    const allBtn = document.createElement('button');
-    allBtn.type = 'button';
+    const allBtn = document.createElement('a');
+    allBtn.href = '#';
     allBtn.textContent = 'All';
-    const noneBtn = document.createElement('button');
-    noneBtn.type = 'button';
+    const noneBtn = document.createElement('a');
+    noneBtn.href = '#';
     noneBtn.textContent = 'None';
     header.appendChild(allBtn);
     header.appendChild(noneBtn);
@@ -240,11 +243,13 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
       li.appendChild(label);
       ul.appendChild(li);
     });
-    allBtn.addEventListener('click', () => {
+    allBtn.addEventListener('click', e => {
+      e.preventDefault();
       ul.querySelectorAll('input').forEach(cb => (cb.checked = true));
       updateSelectedColumns();
     });
-    noneBtn.addEventListener('click', () => {
+    noneBtn.addEventListener('click', e => {
+      e.preventDefault();
       ul.querySelectorAll('input').forEach(cb => (cb.checked = false));
       updateSelectedColumns();
     });
