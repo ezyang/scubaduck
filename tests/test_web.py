@@ -318,6 +318,20 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
     assert chips[-1] == "alice,bob"
 
 
+def test_chip_dropdown_hides_on_outside_click(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    f.query_selector(".f-col").select_option("user")
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
+    page.click("#header")
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown", state="hidden")
+
+
 def test_chip_input_no_outline(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
