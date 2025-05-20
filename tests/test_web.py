@@ -122,7 +122,7 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     assert page.is_hidden("#columns")
     page.click("text=Columns")
     assert page.is_visible("#columns")
-    cols = [c.strip() for c in page.locator("#column_list li").all_inner_texts()]
+    cols = [c.strip() for c in page.locator("#column_groups li").all_inner_texts()]
     assert "timestamp" in cols
     assert "event" in cols
     page.click("text=View Settings")
@@ -171,7 +171,7 @@ def test_table_sorting(page: Any, server_url: str) -> None:
     align = page.evaluate(
         "getComputedStyle(document.querySelector('#results th')).textAlign"
     )
-    assert align == "left"
+    assert align == "right"
 
     header = page.locator("#results th").nth(3)
 
@@ -219,25 +219,25 @@ def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
     page.click("text=Columns")
-    page.wait_for_selector("#column_list input", state="attached")
+    page.wait_for_selector("#column_groups input", state="attached")
 
     count = page.evaluate(
-        "document.querySelectorAll('#column_list input:checked').length"
+        "document.querySelectorAll('#column_groups input:checked').length"
     )
     assert count == 4
 
-    page.click("#toggle_columns")
+    page.click("#columns_none")
     count = page.evaluate(
-        "document.querySelectorAll('#column_list input:checked').length"
+        "document.querySelectorAll('#column_groups input:checked').length"
     )
     assert count == 0
-    page.click("#toggle_columns")
+    page.click("#columns_all")
     count = page.evaluate(
-        "document.querySelectorAll('#column_list input:checked').length"
+        "document.querySelectorAll('#column_groups input:checked').length"
     )
     assert count == 4
 
-    page.uncheck("#column_list input[value='value']")
+    page.uncheck("#column_groups input[value='value']")
     page.click("text=View Settings")
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-02 00:00:00")

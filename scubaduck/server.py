@@ -110,17 +110,31 @@ def build_query(params: QueryParams) -> str:
     if params.end:
         where_parts.append(f"timestamp <= '{params.end}'")
     for f in params.filters:
-        if f.value is None:
-            continue
-        if isinstance(f.value, list):
-            if not f.value:
+        op = f.op
+        if op in {"empty", "!empty"}:
+            val = "''"
+        else:
+            if f.value is None:
                 continue
-            if f.op == "=":
-                vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
-                where_parts.append(f"({vals})")
-                continue
-        val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
-        where_parts.append(f"{f.column} {f.op} {val}")
+            if isinstance(f.value, list):
+                if not f.value:
+                    continue
+                if op == "=":
+                    vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
+                    where_parts.append(f"({vals})")
+                    continue
+            val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
+
+        if op == "contains":
+            where_parts.append(f"{f.column} ILIKE '%' || {val} || '%'")
+        elif op == "!contains":
+            where_parts.append(f"{f.column} NOT ILIKE '%' || {val} || '%'")
+        elif op == "empty":
+            where_parts.append(f"{f.column} = {val}")
+        elif op == "!empty":
+            where_parts.append(f"{f.column} != {val}")
+        else:
+            where_parts.append(f"{f.column} {op} {val}")
     if where_parts:
         query += " WHERE " + " AND ".join(where_parts)
     if params.order_by:
