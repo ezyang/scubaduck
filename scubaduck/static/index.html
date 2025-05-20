@@ -112,8 +112,9 @@
         <div id="query_info" style="margin-top:10px;"></div>
       </div>
       <div id="columns" class="tab-content">
-        <button id="toggle_columns" type="button">All/None</button>
-        <ul id="column_list"></ul>
+        <button id="columns_all" type="button">All</button>
+        <button id="columns_none" type="button">None</button>
+        <div id="column_groups"></div>
       </div>
     </div>
     <div id="view">
@@ -123,6 +124,9 @@
 <script>
 const allColumns = [];
 const columnTypes = {};
+const stringColumns = [];
+const integerColumns = [];
+const timeColumns = [];
 let selectedColumns = [];
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
@@ -136,27 +140,75 @@ orderDirBtn.addEventListener('click', () => {
 updateOrderDirButton();
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
+  const groupsEl = document.getElementById('column_groups');
+  const groups = {
+    time: {name: 'Time', cols: [], ul: null},
+    integer: {name: 'Integers', cols: [], ul: null},
+    string: {name: 'Strings', cols: [], ul: null}
+  };
   cols.forEach(c => {
-    const o = document.createElement('option');
-    o.value = c.name;
-    o.textContent = c.name;
-    orderSelect.appendChild(o);
-    allColumns.push(c.name);
+    const t = c.type.toUpperCase();
     columnTypes[c.name] = c.type;
+    allColumns.push(c.name);
+    let g = 'string';
+    if (t.includes('INT')) g = 'integer';
+    if (t.includes('TIMESTAMP')) g = 'time';
+    groups[g].cols.push(c.name);
+    if (g !== 'string') {
+      const o = document.createElement('option');
+      o.value = c.name;
+      o.textContent = c.name;
+      orderSelect.appendChild(o);
+    }
   });
-  const list = document.getElementById('column_list');
-  cols.forEach(c => {
-    const li = document.createElement('li');
-    const label = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = c.name;
-    cb.checked = true;
-    cb.addEventListener('change', updateSelectedColumns);
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(' ' + c.name));
-    li.appendChild(label);
-    list.appendChild(li);
+  Object.keys(groups).forEach(key => {
+    const g = groups[key];
+    const div = document.createElement('div');
+    div.className = 'col-group';
+    const header = document.createElement('div');
+    header.textContent = g.name + ': ';
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.textContent = 'All';
+    const noneBtn = document.createElement('button');
+    noneBtn.type = 'button';
+    noneBtn.textContent = 'None';
+    header.appendChild(allBtn);
+    header.appendChild(noneBtn);
+    div.appendChild(header);
+    const ul = document.createElement('ul');
+    g.ul = ul;
+    g.cols.forEach(name => {
+      const li = document.createElement('li');
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = name;
+      cb.checked = true;
+      cb.addEventListener('change', updateSelectedColumns);
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + name));
+      li.appendChild(label);
+      ul.appendChild(li);
+    });
+    allBtn.addEventListener('click', () => {
+      ul.querySelectorAll('input').forEach(cb => (cb.checked = true));
+      updateSelectedColumns();
+    });
+    noneBtn.addEventListener('click', () => {
+      ul.querySelectorAll('input').forEach(cb => (cb.checked = false));
+      updateSelectedColumns();
+    });
+    div.appendChild(ul);
+    groupsEl.appendChild(div);
+  });
+  document.getElementById('columns_all').addEventListener('click', () => {
+    groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = true));
+    updateSelectedColumns();
+  });
+  document.getElementById('columns_none').addEventListener('click', () => {
+    groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = false));
+    updateSelectedColumns();
   });
   updateSelectedColumns();
   addFilter();
@@ -186,25 +238,27 @@ document.querySelectorAll('.rel-select').forEach(sel => {
 });
 
 function updateSelectedColumns() {
-  selectedColumns = Array.from(
-    document.querySelectorAll('#column_list input[type=checkbox]')
-  )
-    .filter(cb => cb.checked)
-    .map(cb => cb.value);
-}
-
-document.getElementById('toggle_columns').addEventListener('click', () => {
-  const boxes = document.querySelectorAll('#column_list input[type=checkbox]');
-  const allChecked = Array.from(boxes).every(cb => cb.checked);
-  boxes.forEach(cb => {
-    cb.checked = !allChecked;
+  selectedColumns = allColumns.filter(name => {
+    const cb = document.querySelector(
+      `#column_groups input[value="${name}"]`
+    );
+    return cb && cb.checked;
   });
-  updateSelectedColumns();
-});
+}
 
 function isStringColumn(name) {
   const t = (columnTypes[name] || '').toUpperCase();
   return t.includes('CHAR') || t.includes('STRING') || t.includes('VARCHAR');
+}
+
+function isIntegerColumn(name) {
+  const t = (columnTypes[name] || '').toUpperCase();
+  return t.includes('INT');
+}
+
+function isTimeColumn(name) {
+  const t = (columnTypes[name] || '').toUpperCase();
+  return t.includes('TIMESTAMP');
 }
 
 function initChipInput(filter) {
@@ -371,10 +425,6 @@ function addFilter() {
     <div class="filter-row">
       <select class="f-col"></select>
       <select class="f-op">
-        <option value="=">=</option>
-        <option value="!=">!=</option>
-        <option value="<"><</option>
-        <option value=">">></option>
       </select>
     </div>
     <div class="chip-box">
@@ -386,7 +436,43 @@ function addFilter() {
     </div>
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
-  container.querySelector('.f-col').innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
+  const colSel = container.querySelector('.f-col');
+  colSel.innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  function populateOps() {
+    const opSel = container.querySelector('.f-op');
+    const col = colSel.value;
+    const ops = isStringColumn(col)
+      ? [
+          ['=', '='],
+          ['!=', '!='],
+          ['~', 'matches regex'],
+          ['!~', 'not matches regex'],
+          ['contains', 'contains'],
+          ['!contains', 'not contains'],
+          ['empty', 'empty'],
+          ['!empty', 'not empty'],
+          ['LIKE', 'like'],
+        ]
+      : [
+          ['=', '='],
+          ['!=', '!='],
+          ['<', '<'],
+          ['>', '>'],
+        ];
+    opSel.innerHTML = ops.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('');
+    updateInputVis();
+  }
+
+  function updateInputVis() {
+    const op = container.querySelector('.f-op').value;
+    const box = container.querySelector('.chip-box');
+    box.style.display = op === 'empty' || op === '!empty' ? 'none' : 'block';
+  }
+
+  colSel.addEventListener('change', populateOps);
+  container.querySelector('.f-op').addEventListener('change', updateInputVis);
+  populateOps();
   document.getElementById('filter_list').appendChild(container);
   initChipInput(container);
 }
@@ -406,8 +492,12 @@ function dive() {
   };
   payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
     const chips = f.chips || [];
-    const value = chips.length === 0 ? null : (chips.length === 1 ? chips[0] : chips);
-    return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value};
+    const op = f.querySelector('.f-op').value;
+    let value = null;
+    if (op !== 'empty' && op !== '!empty') {
+      value = chips.length === 0 ? null : (chips.length === 1 ? chips[0] : chips);
+    }
+    return {column: f.querySelector('.f-col').value, op, value};
   });
   const view = document.getElementById('view');
   view.innerHTML = '<p>Loading...</p>';
@@ -437,13 +527,33 @@ function renderTable(rows) {
       th.classList.add('sorted');
       th.textContent = col + (sortState.dir === 'desc' ? ' \u25BC' : ' \u25B2');
     }
+    if (!isStringColumn(col)) th.style.textAlign = 'right';
     header.appendChild(th);
   });
   table.appendChild(header);
   rows.forEach(row => {
     const tr = document.createElement('tr');
-    row.forEach(v => {
-      const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
+    row.forEach((v, i) => {
+      const col = selectedColumns[i];
+      const td = document.createElement('td');
+      if (isTimeColumn(col)) {
+        const d = new Date(v.replace(' ', 'T'));
+        td.textContent = d.toLocaleString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          second: 'numeric',
+          hour12: true,
+          timeZoneName: 'short'
+        });
+      } else {
+        td.textContent = v;
+      }
+      td.style.textAlign = isStringColumn(col) ? 'left' : 'right';
+      tr.appendChild(td);
     });
     table.appendChild(tr);
   });

@@ -97,3 +97,42 @@ def test_select_columns() -> None:
     rows = data["rows"]
     assert len(rows[0]) == 2
     assert rows[0][1] == "alice"
+
+
+def test_string_filter_ops() -> None:
+    app = server.app
+    client = app.test_client()
+    base = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "order_by": "timestamp",
+        "limit": 100,
+        "columns": ["timestamp", "event", "value", "user"],
+    }
+
+    contains = {
+        **base,
+        "filters": [{"column": "user", "op": "contains", "value": "ali"}],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(contains), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert all("ali" in r[3] for r in rows)
+
+    regex = {
+        **base,
+        "filters": [{"column": "user", "op": "~", "value": "^a.*"}],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(regex), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert all(r[3].startswith("a") for r in rows)
+    assert len(rows) == 2
+
+    not_empty = {**base, "filters": [{"column": "user", "op": "!empty"}]}
+    rv = client.post(
+        "/api/query", data=json.dumps(not_empty), content_type="application/json"
+    )
+    assert len(rv.get_json()["rows"]) == 4
