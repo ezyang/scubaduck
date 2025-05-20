@@ -94,6 +94,21 @@ def test_simple_filter(page: Any, server_url: str) -> None:
     assert all(row[3] == "alice" for row in data["rows"])
 
 
+def test_default_filter_and_layout(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    count = page.evaluate("document.querySelectorAll('#filters .filter').length")
+    assert count == 1
+    last_is_button = page.evaluate(
+        "document.querySelector('#filters').lastElementChild.id === 'add_filter'"
+    )
+    assert last_is_button
+    position = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter button.remove')).position"
+    )
+    assert position == "absolute"
+
+
 def test_header_and_tabs(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

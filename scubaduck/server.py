@@ -58,12 +58,17 @@ def build_query(params: QueryParams) -> str:
     if params.end:
         where_parts.append(f"timestamp <= '{params.end}'")
     for f in params.filters:
-        if f.op == "=" and isinstance(f.value, list):
-            vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
-            where_parts.append(f"({vals})")
-        else:
-            val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
-            where_parts.append(f"{f.column} {f.op} {val}")
+        if f.value is None:
+            continue
+        if isinstance(f.value, list):
+            if not f.value:
+                continue
+            if f.op == "=":
+                vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
+                where_parts.append(f"({vals})")
+                continue
+        val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
+        where_parts.append(f"{f.column} {f.op} {val}")
     if where_parts:
         query += " WHERE " + " AND ".join(where_parts)
     if params.order_by:
