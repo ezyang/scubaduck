@@ -190,3 +190,25 @@ def test_database_types(tmp_path: Path) -> None:
         )
         rows = rv.get_json()["rows"]
         assert len(rows) == 3
+
+
+def test_group_by_table() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "order_by": "user",
+        "limit": 10,
+        "columns": ["value"],
+        "group_by": ["user"],
+        "aggregate": "Sum",
+        "show_hits": True,
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert rows[0][0] == "alice"
+    assert rows[0][1] == 2
+    assert rows[0][2] == 40

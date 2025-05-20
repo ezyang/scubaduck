@@ -43,14 +43,14 @@
       margin: 2px;
       outline: none;
     }
-    #filters .filter .chip-box { position: relative; }
-    #filters .chip-input { display: flex; flex-wrap: wrap; border: 1px solid #ccc; padding: 2px; min-height: 24px; }
-    #filters .chip { background: #eee; border: 1px solid #999; padding: 2px 4px; margin: 2px; border-radius: 3px; display: flex; align-items: center; }
-    #filters .chip .x { margin-left: 4px; cursor: pointer; }
-    #filters .chip-copy { margin-left: 4px; cursor: pointer; background: none; border: none; }
-    #filters .chip-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; max-height: 120px; overflow-y: auto; z-index: 10; display: none; }
-    #filters .chip-dropdown div { padding: 2px 4px; cursor: pointer; }
-    #filters .chip-dropdown div.highlight { background: #bde4ff; }
+    .chip-box { position: relative; }
+    .chip-input { display: flex; flex-wrap: wrap; border: 1px solid #ccc; padding: 2px; min-height: 24px; }
+    .chip { background: #eee; border: 1px solid #999; padding: 2px 4px; margin: 2px; border-radius: 3px; display: flex; align-items: center; }
+    .chip .x { margin-left: 4px; cursor: pointer; }
+    .chip-copy { margin-left: 4px; cursor: pointer; background: none; border: none; }
+    .chip-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; max-height: 120px; overflow-y: auto; z-index: 10; display: none; }
+    .chip-dropdown div { padding: 2px 4px; cursor: pointer; }
+    .chip-dropdown div.highlight { background: #bde4ff; }
     .rel-box { position: relative; display: flex; }
     .rel-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; z-index: 10; display: none; }
     .rel-dropdown div { padding: 2px 4px; cursor: pointer; }
@@ -88,7 +88,7 @@
   </style>
 </head>
 <body>
-  <div id="header">sample.csv - events</div>
+  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option></select></div>
   <div id="content">
     <div id="sidebar">
       <div id="tabs">
@@ -143,6 +143,41 @@
           <label>Limit<span class="help" title="Choose the maximum number of results to show in the chart after any aggregations have been applied. For example, a limit of 10 will show no more than 10 rows for a table, etc.">[?]</span></label>
           <input id="limit" type="number" value="100" />
         </div>
+        <div id="group_by_field" class="field" style="display:none;">
+          <label>Group By</label>
+          <div class="chip-box">
+            <div class="chip-input">
+              <input id="group_by" class="f-val" type="text">
+              <button type="button" class="chip-copy">\u2398</button>
+            </div>
+            <div class="chip-dropdown"></div>
+          </div>
+        </div>
+        <div id="aggregate_field" class="field" style="display:none;">
+          <label>Aggregate</label>
+          <select id="aggregate">
+            <option>Avg</option>
+            <option>Count</option>
+            <option>Sum</option>
+            <option>Min</option>
+            <option>Max</option>
+            <option>Count Distinct</option>
+            <option>p5</option>
+            <option>p25</option>
+            <option>p50</option>
+            <option>p70</option>
+            <option>p75</option>
+            <option>p90</option>
+            <option>p95</option>
+            <option>p99</option>
+            <option>p99.9</option>
+            <option>p99.99</option>
+          </select>
+        </div>
+        <div id="show_hits_field" class="field" style="display:none;">
+          <label>Show Hits</label>
+          <input id="show_hits" type="checkbox" checked>
+        </div>
         <div id="filters">
           <h4>Filters<span class="help" title="You can create as many filters as you want. You can either write a filter using a UI or manual SQL. In the UI, filter consists of a column name, a relation (e.g., =, !=, <, >) and then a text field. The text field is a token input. It accepts multiple tokens for = relation, in which case we match using an OR for all options.">[?]</span></h4>
           <div id="filter_list"></div>
@@ -170,6 +205,8 @@ const stringColumns = [];
 const integerColumns = [];
 const timeColumns = [];
 let selectedColumns = [];
+let displayType = 'samples';
+let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
 // Sidebar resizing
 const sidebar = document.getElementById('sidebar');
 const sidebarResizer = document.getElementById('sidebar-resizer');
@@ -196,14 +233,29 @@ function stopSidebarDrag() {
 sidebarResizer.addEventListener('mousedown', startSidebarDrag);
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
+const graphTypeSel = document.getElementById('graph_type');
 function updateOrderDirButton() {
   orderDirBtn.textContent = orderDir + (orderDir === 'ASC' ? ' \u25B2' : ' \u25BC');
+}
+
+function updateDisplayTypeUI() {
+  const show = graphTypeSel.value === 'table';
+  document.getElementById('group_by_field').style.display = show ? 'flex' : 'none';
+  document.getElementById('aggregate_field').style.display = show ? 'flex' : 'none';
+  document.getElementById('show_hits_field').style.display = show ? 'flex' : 'none';
+  document.querySelectorAll('#column_groups .col-group').forEach(g => {
+    if (g.querySelector('.col-group-header').textContent.startsWith('Strings')) {
+      g.style.display = show ? 'none' : '';
+    }
+  });
+  displayType = graphTypeSel.value;
 }
 orderDirBtn.addEventListener('click', () => {
   orderDir = orderDir === 'ASC' ? 'DESC' : 'ASC';
   updateOrderDirButton();
 });
 updateOrderDirButton();
+graphTypeSel.addEventListener('change', updateDisplayTypeUI);
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
   const groupsEl = document.getElementById('column_groups');
@@ -285,6 +337,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     updateSelectedColumns();
   });
   updateSelectedColumns();
+  groupBy = document.getElementById('group_by').closest('.field');
+  initChipInput(groupBy);
+  updateDisplayTypeUI();
   addFilter();
   initFromUrl();
 });
@@ -321,12 +376,19 @@ document.addEventListener('click', e => {
 });
 
 function updateSelectedColumns() {
-  selectedColumns = allColumns.filter(name => {
-    const cb = document.querySelector(
-      `#column_groups input[value="${name}"]`
-    );
+  const base = allColumns.filter(name => {
+    const cb = document.querySelector(`#column_groups input[value="${name}"]`);
     return cb && cb.checked;
   });
+  if (graphTypeSel.value === 'table') {
+    selectedColumns = groupBy.chips.slice();
+    if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
+    base.forEach(c => {
+      if (!selectedColumns.includes(c)) selectedColumns.push(c);
+    });
+  } else {
+    selectedColumns = base;
+  }
 }
 
 function isStringColumn(name) {
@@ -480,7 +542,9 @@ function initChipInput(filter) {
   }
 
   function loadOptions() {
-    const col = filter.querySelector('.f-col').value;
+    const colSel = filter.querySelector('.f-col');
+    if (!colSel) return;
+    const col = colSel.value;
     if (!isStringColumn(col)) {
       dropdown.innerHTML = '';
       return;
@@ -493,8 +557,10 @@ function initChipInput(filter) {
       });
   }
 
-  input.addEventListener('focus', loadOptions);
-  input.addEventListener('input', loadOptions);
+  if (filter.querySelector('.f-col')) {
+    input.addEventListener('focus', loadOptions);
+    input.addEventListener('input', loadOptions);
+  }
 
   document.addEventListener('click', evt => {
     if (!filter.contains(evt.target)) {
@@ -571,6 +637,7 @@ function dive(push=true) {
   }
   const view = document.getElementById('view');
   view.innerHTML = '<p>Loading...</p>';
+  window.lastResults = undefined;
   queryStart = performance.now();
   fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(r=>r.json())
@@ -589,6 +656,10 @@ function collectParams() {
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
     columns: selectedColumns,
+    graph_type: graphTypeSel.value,
+    group_by: groupBy.chips || [],
+    aggregate: document.getElementById('aggregate').value,
+    show_hits: document.getElementById('show_hits').checked,
     filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
       const chips = f.chips || [];
       const op = f.querySelector('.f-op').value;
@@ -611,6 +682,10 @@ function paramsToSearch(params) {
   if (params.limit !== null && params.limit !== undefined) sp.set('limit', params.limit);
   if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
   if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
+  if (params.graph_type) sp.set('graph_type', params.graph_type);
+  if (params.group_by && params.group_by.length) sp.set('group_by', params.group_by.join(','));
+  if (params.aggregate) sp.set('aggregate', params.aggregate);
+  if (params.show_hits) sp.set('show_hits', '1');
   const qs = sp.toString();
   return qs ? '?' + qs : '';
 }
@@ -626,6 +701,14 @@ function applyParams(params) {
   if (params.limit !== undefined && params.limit !== null) {
     document.getElementById('limit').value = params.limit;
   }
+  graphTypeSel.value = params.graph_type || 'samples';
+  updateDisplayTypeUI();
+  if (params.group_by) {
+    groupBy.chips = params.group_by.slice();
+    groupBy.renderChips();
+  }
+  if (params.aggregate) document.getElementById('aggregate').value = params.aggregate;
+  document.getElementById('show_hits').checked = params.show_hits ?? true;
   document.querySelectorAll('#column_groups input').forEach(cb => {
     cb.checked = !params.columns || params.columns.includes(cb.value);
   });
@@ -663,6 +746,10 @@ function parseSearch() {
   if (sp.has('filters')) {
     try { params.filters = JSON.parse(sp.get('filters')); } catch(e) { params.filters = []; }
   }
+  if (sp.has('graph_type')) params.graph_type = sp.get('graph_type');
+  if (sp.has('group_by')) params.group_by = sp.get('group_by').split(',').filter(c => c);
+  if (sp.has('aggregate')) params.aggregate = sp.get('aggregate');
+  if (sp.has('show_hits')) params.show_hits = sp.get('show_hits') === '1';
   return params;
 }
 
@@ -686,6 +773,11 @@ function renderTable(rows) {
   const table = document.getElementById('results');
   table.innerHTML = '';
   if (rows.length === 0) return;
+  let hitsIndex = selectedColumns.indexOf('Hits');
+  let totalHits = 0;
+  if (hitsIndex !== -1) {
+    totalHits = rows.reduce((s, r) => s + Number(r[hitsIndex]), 0);
+  }
   const header = document.createElement('tr');
   selectedColumns.forEach((col, i) => {
     const th = document.createElement('th');
@@ -722,7 +814,12 @@ function renderTable(rows) {
           timeZoneName: 'short'
         });
       } else {
-        td.textContent = v;
+        if (col === 'Hits') {
+          const pct = totalHits ? ((v / totalHits) * 100).toFixed(1) : '0';
+          td.textContent = `${v} (${pct}%)`;
+        } else {
+          td.textContent = v;
+        }
       }
       td.style.textAlign = isStringColumn(col) ? 'left' : 'right';
       tr.appendChild(td);

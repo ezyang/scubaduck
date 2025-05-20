@@ -144,6 +144,17 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     assert view_overflow == "auto"
 
 
+def test_graph_type_table_fields(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    page.select_option("#graph_type", "table")
+    assert page.is_visible("#group_by_field")
+    assert page.is_visible("#aggregate_field")
+    assert page.is_visible("#show_hits_field")
+    page.click("text=Columns")
+    assert not page.is_visible("text=Strings:")
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
