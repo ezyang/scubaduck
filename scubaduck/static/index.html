@@ -19,7 +19,18 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     #filter_list { display: flex; flex-direction: column; }
-    #filters .filter { border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; position: relative; }
+    #filters .filter {
+      border: 1px solid #ccc;
+      padding: 5px;
+      margin-bottom: 5px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #filters .filter-row { display: flex; margin-bottom: 5px; }
+    #filters .filter-row .f-col { flex: 1; }
+    #filters .filter-row .f-op { width: 60px; margin-left: 5px; }
+    #filters .filter input.f-val { width: 100%; box-sizing: border-box; }
     #filters .filter button.remove { position: absolute; top: 2px; right: 2px; }
     #filters h4 { margin: 0 0 5px 0; }
     th { text-align: left; cursor: pointer; }
@@ -104,13 +115,15 @@ function addFilter() {
   const container = document.createElement('div');
   container.className = 'filter';
   container.innerHTML = `
-    <select class="f-col"></select>
-    <select class="f-op">
-      <option value="=">=</option>
-      <option value="!=">!=</option>
-      <option value="<"><</option>
-      <option value=">">></option>
-    </select>
+    <div class="filter-row">
+      <select class="f-col"></select>
+      <select class="f-op">
+        <option value="=">=</option>
+        <option value="!=">!=</option>
+        <option value="<"><</option>
+        <option value=">">></option>
+      </select>
+    </div>
     <input class="f-val" type="text">
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
