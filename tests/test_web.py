@@ -212,8 +212,16 @@ def test_relative_dropdown(page: Any, server_url: str) -> None:
     btn = page.query_selector('[data-target="start-select"]')
     assert btn
     btn.click()
-    page.select_option("#start-select", "-3 hours")
+    page.click("#start-select div:text('-3 hours')")
     assert page.input_value("#start") == "-3 hours"
+
+
+def test_end_dropdown_now(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click('[data-target="end-select"]')
+    page.click("#end-select div:text('now')")
+    assert page.input_value("#end") == "now"
 
 
 def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
