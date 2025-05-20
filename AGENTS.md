@@ -12,3 +12,5 @@
   installed.
 - Use "ruff check" to check lint, "ruff format" to autoformat files and
   "pyright" to typecheck.
+- When writing the PR description, include the original prompt supplied by the
+  user.
