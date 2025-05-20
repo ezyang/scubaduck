@@ -28,6 +28,10 @@ class QueryParams:
     columns: list[str] = field(default_factory=lambda: [])
     filters: list[Filter] = field(default_factory=lambda: [])
     derived_columns: dict[str, str] = field(default_factory=lambda: {})
+    graph_type: str = "samples"
+    group_by: list[str] = field(default_factory=lambda: [])
+    aggregate: str | None = None
+    show_hits: bool = False
 
 
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
@@ -53,7 +57,27 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
 
 
 def build_query(params: QueryParams) -> str:
-    select_parts = [*params.columns]
+    select_parts: list[str] = []
+    if params.group_by:
+        select_parts.extend(params.group_by)
+        agg = (params.aggregate or "avg").lower()
+
+        def agg_expr(col: str) -> str:
+            if agg.startswith("p"):
+                quant = float(agg[1:]) / 100
+                return f"quantile({col}, {quant})"
+            if agg == "count distinct":
+                return f"count(DISTINCT {col})"
+            return f"{agg}({col})"
+
+        for col in params.columns:
+            if col in params.group_by:
+                continue
+            select_parts.append(f"{agg_expr(col)} AS {col}")
+        if params.show_hits:
+            select_parts.insert(len(params.group_by), "count(*) AS Hits")
+    else:
+        select_parts.extend(params.columns)
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
@@ -91,6 +115,8 @@ def build_query(params: QueryParams) -> str:
             where_parts.append(f"{f.column} {op} {val}")
     if where_parts:
         query += " WHERE " + " AND ".join(where_parts)
+    if params.group_by:
+        query += " GROUP BY " + ", ".join(params.group_by)
     if params.order_by:
         query += f" ORDER BY {params.order_by} {params.order_dir}"
     if params.limit is not None:
@@ -169,6 +195,10 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             limit=payload.get("limit"),
             columns=payload.get("columns", []),
             derived_columns=payload.get("derived_columns", {}),
+            graph_type=payload.get("graph_type", "samples"),
+            group_by=payload.get("group_by", []),
+            aggregate=payload.get("aggregate"),
+            show_hits=payload.get("show_hits", False),
         )
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
