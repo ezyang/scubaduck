@@ -252,6 +252,19 @@ def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
     assert "value" not in headers
 
 
+def test_columns_links_alignment(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    tag = page.evaluate("document.getElementById('columns_all').tagName")
+    assert tag == "A"
+    align = page.evaluate(
+        "getComputedStyle(document.querySelector('#column_actions')).textAlign"
+    )
+    assert align == "right"
+
+
 def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
