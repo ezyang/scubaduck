@@ -252,6 +252,7 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   });
   updateSelectedColumns();
   addFilter();
+  initFromUrl();
 });
 
 document.querySelectorAll('#tabs .tab').forEach(btn => {
@@ -308,6 +309,8 @@ function initChipInput(filter) {
   const copyBtn = filter.querySelector('.chip-copy');
   const chips = [];
   filter.chips = chips;
+  filter.renderChips = renderChips;
+  filter.addChip = addChip;
   let options = [];
   let highlight = 0;
 
@@ -519,25 +522,11 @@ function addFilter() {
 let lastQueryTime = 0;
 let queryStart = 0;
 
-function dive() {
-  updateSelectedColumns();
-  const payload = {
-    start: document.getElementById('start').value,
-    end: document.getElementById('end').value,
-    order_by: document.getElementById('order_by').value,
-    order_dir: orderDir,
-    limit: parseInt(document.getElementById('limit').value, 10),
-    columns: selectedColumns
-  };
-  payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
-    const chips = f.chips || [];
-    const op = f.querySelector('.f-op').value;
-    let value = null;
-    if (op !== 'empty' && op !== '!empty') {
-      value = chips.length === 0 ? null : (chips.length === 1 ? chips[0] : chips);
-    }
-    return {column: f.querySelector('.f-col').value, op, value};
-  });
+function dive(push=true) {
+  const payload = collectParams();
+  if (push) {
+    history.pushState(payload, '', paramsToSearch(payload));
+  }
   const view = document.getElementById('view');
   view.innerHTML = '<p>Loading...</p>';
   queryStart = performance.now();
@@ -548,6 +537,105 @@ function dive() {
       showResults(data);
     });
 }
+
+function collectParams() {
+  updateSelectedColumns();
+  const payload = {
+    start: document.getElementById('start').value,
+    end: document.getElementById('end').value,
+    order_by: document.getElementById('order_by').value,
+    order_dir: orderDir,
+    limit: parseInt(document.getElementById('limit').value, 10),
+    columns: selectedColumns,
+    filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
+      const chips = f.chips || [];
+      const op = f.querySelector('.f-op').value;
+      let value = null;
+      if (op !== 'empty' && op !== '!empty') {
+        value = chips.length === 0 ? null : (chips.length === 1 ? chips[0] : chips);
+      }
+      return {column: f.querySelector('.f-col').value, op, value};
+    })
+  };
+  return payload;
+}
+
+function paramsToSearch(params) {
+  const sp = new URLSearchParams();
+  if (params.start) sp.set('start', params.start);
+  if (params.end) sp.set('end', params.end);
+  if (params.order_by) sp.set('order_by', params.order_by);
+  if (params.order_dir) sp.set('order_dir', params.order_dir);
+  if (params.limit !== null && params.limit !== undefined) sp.set('limit', params.limit);
+  if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
+  if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
+  const qs = sp.toString();
+  return qs ? '?' + qs : '';
+}
+
+function applyParams(params) {
+  document.getElementById('start').value = params.start || '';
+  document.getElementById('end').value = params.end || '';
+  if (params.order_by) {
+    document.getElementById('order_by').value = params.order_by;
+  }
+  orderDir = params.order_dir || 'ASC';
+  updateOrderDirButton();
+  if (params.limit !== undefined && params.limit !== null) {
+    document.getElementById('limit').value = params.limit;
+  }
+  document.querySelectorAll('#column_groups input').forEach(cb => {
+    cb.checked = !params.columns || params.columns.includes(cb.value);
+  });
+  updateSelectedColumns();
+  const list = document.getElementById('filter_list');
+  list.innerHTML = '';
+  if (params.filters && params.filters.length) {
+    params.filters.forEach(f => {
+      addFilter();
+      const el = list.lastElementChild;
+      el.querySelector('.f-col').value = f.column;
+      el.querySelector('.f-col').dispatchEvent(new Event('change'));
+      el.querySelector('.f-op').value = f.op;
+      el.querySelector('.f-op').dispatchEvent(new Event('change'));
+      if (f.value !== null && f.op !== 'empty' && f.op !== '!empty') {
+        const values = Array.isArray(f.value) ? f.value : [f.value];
+        values.forEach(v => el.addChip(v));
+        el.renderChips();
+      }
+    });
+  } else {
+    addFilter();
+  }
+}
+
+function parseSearch() {
+  const sp = new URLSearchParams(window.location.search);
+  const params = {};
+  if (sp.has('start')) params.start = sp.get('start');
+  if (sp.has('end')) params.end = sp.get('end');
+  if (sp.has('order_by')) params.order_by = sp.get('order_by');
+  if (sp.has('order_dir')) params.order_dir = sp.get('order_dir');
+  if (sp.has('limit')) params.limit = parseInt(sp.get('limit'), 10);
+  if (sp.has('columns')) params.columns = sp.get('columns').split(',').filter(c => c);
+  if (sp.has('filters')) {
+    try { params.filters = JSON.parse(sp.get('filters')); } catch(e) { params.filters = []; }
+  }
+  return params;
+}
+
+function initFromUrl() {
+  const params = parseSearch();
+  history.replaceState(params, '', paramsToSearch(params));
+  applyParams(params);
+  dive(false);
+}
+
+window.addEventListener('popstate', e => {
+  const params = e.state || parseSearch();
+  applyParams(params);
+  dive(false);
+});
 
 let originalRows = [];
 let sortState = {index: null, dir: null};
