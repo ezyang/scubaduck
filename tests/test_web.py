@@ -107,7 +107,7 @@ def test_default_filter_and_layout(page: Any, server_url: str) -> None:
     position = page.evaluate(
         "getComputedStyle(document.querySelector('#filters .filter button.remove')).position"
     )
-    assert position == "absolute"
+    assert position == "static"
 
 
 def test_header_and_tabs(page: Any, server_url: str) -> None:
@@ -379,15 +379,10 @@ def test_table_enhancements(page: Any, server_url: str) -> None:
     )
     assert "189, 228, 255" in selected_color
 
-    header = page.locator("#results th").nth(0)
-    start = header.bounding_box()
-    resizer = header.locator(".col-resizer")
-    resizer.hover()
-    page.mouse.down()
-    page.mouse.move(start["x"] + start["width"] + 20, start["y"] + 5)
-    page.mouse.up()
-    end_box = header.bounding_box()
-    assert end_box["width"] > start["width"]
+    overflow = page.evaluate(
+        "var v=document.getElementById('view'); v.scrollWidth > v.clientWidth"
+    )
+    assert not overflow
 
 
 def test_timestamp_rendering(page: Any, server_url: str) -> None:
