@@ -32,7 +32,11 @@
     }
     #filters .filter-row { display: flex; margin-bottom: 5px; }
     #filters .filter-row .f-col { flex: 1; }
-    #filters .filter-row .f-op { margin-left: 5px; min-width: 60px; }
+    #filters .filter-row .f-op {
+      margin-left: 5px;
+      width: fit-content;
+      flex: 0 0 auto;
+    }
     #filters .filter input.f-val {
       border: none;
       flex: 1;
@@ -48,7 +52,11 @@
     #filters .chip-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; max-height: 120px; overflow-y: auto; z-index: 10; display: none; }
     #filters .chip-dropdown div { padding: 2px 4px; cursor: pointer; }
     #filters .chip-dropdown div.highlight { background: #bde4ff; }
-    #filters .filter button.remove { align-self: flex-end; margin-top: 4px; }
+    #filters .filter button.remove {
+      margin-left: 5px;
+      width: 20px;
+      flex: 0 0 auto;
+    }
     #filters h4 { margin: 0 0 5px 0; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border: 1px solid #ccc; padding: 4px; box-sizing: border-box; }
@@ -463,8 +471,8 @@ function addFilter() {
   container.innerHTML = `
     <div class="filter-row">
       <select class="f-col"></select>
-      <select class="f-op">
-      </select>
+      <select class="f-op"></select>
+      <button type="button" class="remove" onclick="this.closest('.filter').remove()">X</button>
     </div>
     <div class="chip-box">
       <div class="chip-input">
@@ -473,7 +481,6 @@ function addFilter() {
       </div>
       <div class="chip-dropdown"></div>
     </div>
-    <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
   const colSel = container.querySelector('.f-col');
   colSel.innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
