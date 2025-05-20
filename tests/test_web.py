@@ -107,7 +107,7 @@ def test_default_filter_and_layout(page: Any, server_url: str) -> None:
     position = page.evaluate(
         "getComputedStyle(document.querySelector('#filters .filter button.remove')).position"
     )
-    assert position == "absolute"
+    assert position == "static"
 
 
 def test_header_and_tabs(page: Any, server_url: str) -> None:

@@ -7,7 +7,8 @@
     body { margin: 0; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
     #header { padding: 10px; font-weight: bold; border-bottom: 1px solid #ccc; }
     #content { flex: 1; display: flex; height: calc(100vh - 42px); overflow: hidden; }
-    #sidebar { width: 300px; padding: 10px; border-right: 1px solid #ccc; overflow-y: auto; display: flex; flex-direction: column; }
+    #sidebar { width: 450px; padding: 10px; border-right: 3px solid #ccc; overflow-y: auto; display: flex; flex-direction: column; box-sizing: border-box; }
+    #sidebar-resizer { width: 5px; cursor: col-resize; background: #ccc; }
     #view { flex: 1; padding: 10px; overflow-y: auto; overflow-x: auto; }
     .field { display: flex; align-items: center; margin-bottom: 10px; }
     .field label { width: 80px; text-align: right; margin-right: 5px; }
@@ -31,7 +32,7 @@
     }
     #filters .filter-row { display: flex; margin-bottom: 5px; }
     #filters .filter-row .f-col { flex: 1; }
-    #filters .filter-row .f-op { width: 60px; margin-left: 5px; }
+    #filters .filter-row .f-op { margin-left: 5px; min-width: 60px; }
     #filters .filter input.f-val {
       border: none;
       flex: 1;
@@ -47,7 +48,7 @@
     #filters .chip-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; max-height: 120px; overflow-y: auto; z-index: 10; display: none; }
     #filters .chip-dropdown div { padding: 2px 4px; cursor: pointer; }
     #filters .chip-dropdown div.highlight { background: #bde4ff; }
-    #filters .filter button.remove { position: absolute; top: 2px; right: 2px; }
+    #filters .filter button.remove { align-self: flex-end; margin-top: 4px; }
     #filters h4 { margin: 0 0 5px 0; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border: 1px solid #ccc; padding: 4px; box-sizing: border-box; }
@@ -130,6 +131,7 @@
         <div id="column_groups"></div>
       </div>
     </div>
+    <div id="sidebar-resizer"></div>
     <div id="view">
       <table id="results"></table>
     </div>
@@ -141,6 +143,30 @@ const stringColumns = [];
 const integerColumns = [];
 const timeColumns = [];
 let selectedColumns = [];
+// Sidebar resizing
+const sidebar = document.getElementById('sidebar');
+const sidebarResizer = document.getElementById('sidebar-resizer');
+let sidebarWidth = parseInt(localStorage.getItem('sidebarWidth') || 450, 10);
+sidebar.style.width = sidebarWidth + 'px';
+let sidebarResize = false;
+function startSidebarDrag(e) {
+  e.preventDefault();
+  sidebarResize = true;
+  document.addEventListener('mousemove', onSidebarDrag);
+  document.addEventListener('mouseup', stopSidebarDrag);
+}
+function onSidebarDrag(e) {
+  if (!sidebarResize) return;
+  sidebarWidth = Math.max(200, e.clientX - sidebar.getBoundingClientRect().left);
+  sidebar.style.width = sidebarWidth + 'px';
+}
+function stopSidebarDrag() {
+  document.removeEventListener('mousemove', onSidebarDrag);
+  document.removeEventListener('mouseup', stopSidebarDrag);
+  sidebarResize = false;
+  localStorage.setItem('sidebarWidth', sidebarWidth);
+}
+sidebarResizer.addEventListener('mousedown', startSidebarDrag);
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
 function updateOrderDirButton() {
