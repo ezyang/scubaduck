@@ -16,6 +16,7 @@ def run_query(
     page.goto(url)
     page.wait_for_selector("#order_by option", state="attached")
     page.wait_for_selector("#order_dir", state="attached")
+    page.wait_for_function("window.lastResults !== undefined")
     if start is not None:
         page.fill("#start", start)
     if end is not None:
@@ -411,3 +412,45 @@ def test_timestamp_rendering(page: Any, server_url: str) -> None:
     assert cell != "Invalid Date"
     valid = page.evaluate("v => !isNaN(Date.parse(v))", cell)
     assert valid
+
+
+def test_url_query_persistence(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-02 00:00:00")
+    page.fill("#limit", "1")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    first_url = page.url
+    first_rows = page.evaluate("window.lastResults.rows.length")
+
+    page.fill("#limit", "2")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    second_url = page.url
+    second_rows = page.evaluate("window.lastResults.rows.length")
+    assert second_rows != first_rows
+    assert first_url != second_url
+
+    page.go_back()
+    page.wait_for_function("window.lastResults !== undefined")
+    assert page.url == first_url
+    assert page.evaluate("window.lastResults.rows.length") == first_rows
+
+
+def test_load_from_url(page: Any, server_url: str) -> None:
+    url = (
+        f"{server_url}?start=2024-01-01%2000:00:00&end=2024-01-02%2000:00:00"
+        "&order_by=timestamp&limit=2"
+    )
+    page.goto(url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.wait_for_function("window.lastResults !== undefined")
+    assert page.input_value("#start") == "2024-01-01 00:00:00"
+    assert page.input_value("#end") == "2024-01-02 00:00:00"
+    assert page.input_value("#limit") == "2"
+    assert page.evaluate("window.lastResults.rows.length") == 2
