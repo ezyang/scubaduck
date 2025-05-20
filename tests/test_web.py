@@ -159,8 +159,7 @@ def test_table_sorting(page: Any, server_url: str) -> None:
 
     header = page.locator("#results th").nth(3)
 
-    def values():
-        """Return the values from the fourth column."""
+    def values() -> list[str]:
         return page.locator("#results td:nth-child(4)").all_inner_texts()
 
     orig_rows = values()
@@ -169,8 +168,8 @@ def test_table_sorting(page: Any, server_url: str) -> None:
     first_sql = page.evaluate("window.lastResults.sql")
 
     header.click()
-    assert values() == sorted(orig_rows, reverse=True)
-    assert header.inner_text().endswith("▼")
+    assert values() == sorted(orig_rows)
+    assert header.inner_text().endswith("▲")
     color = page.evaluate(
         "getComputedStyle(document.querySelector('#results th:nth-child(4)')).color"
     )
@@ -178,8 +177,8 @@ def test_table_sorting(page: Any, server_url: str) -> None:
     assert page.evaluate("window.lastResults.sql") == first_sql
 
     header.click()
-    assert values() == sorted(orig_rows)
-    assert header.inner_text().endswith("▲")
+    assert values() == sorted(orig_rows, reverse=True)
+    assert header.inner_text().endswith("▼")
 
     header.click()
     assert values() == orig_rows
