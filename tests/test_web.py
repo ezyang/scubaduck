@@ -330,3 +330,16 @@ def test_chip_dropdown_hides_on_outside_click(page: Any, server_url: str) -> Non
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
     page.click("#header")
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown", state="hidden")
+
+
+def test_chip_input_no_outline(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    inp = page.query_selector("#filters .filter:last-child .f-val")
+    assert inp
+    inp.click()
+    outline = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .f-val')).outlineStyle"
+    )
+    assert outline == "none"
