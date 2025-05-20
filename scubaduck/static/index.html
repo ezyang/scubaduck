@@ -65,6 +65,13 @@
     tr:nth-child(even) td { background: #f9f9f9; }
     tr.selected td { background: #bde4ff !important; }
     tr:hover:not(.selected) td { background: #eee; }
+    #column_actions {
+      text-align: right;
+      margin-bottom: 5px;
+    }
+    #column_actions a {
+      margin-left: 5px;
+    }
     /* Column resizer removed */
   </style>
 </head>
@@ -127,8 +134,10 @@
         <div id="query_info" style="margin-top:10px;"></div>
       </div>
       <div id="columns" class="tab-content">
-        <button id="columns_all" type="button">All</button>
-        <button id="columns_none" type="button">None</button>
+        <div id="column_actions">
+          <a id="columns_all" href="#">All</a>
+          <a id="columns_none" href="#">None</a>
+        </div>
         <div id="column_groups"></div>
       </div>
     </div>
@@ -242,11 +251,13 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     div.appendChild(ul);
     groupsEl.appendChild(div);
   });
-  document.getElementById('columns_all').addEventListener('click', () => {
+  document.getElementById('columns_all').addEventListener('click', e => {
+    e.preventDefault();
     groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = true));
     updateSelectedColumns();
   });
-  document.getElementById('columns_none').addEventListener('click', () => {
+  document.getElementById('columns_none').addEventListener('click', e => {
+    e.preventDefault();
     groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = false));
     updateSelectedColumns();
   });
