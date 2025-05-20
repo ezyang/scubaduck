@@ -343,3 +343,48 @@ def test_chip_input_no_outline(page: Any, server_url: str) -> None:
         "getComputedStyle(document.querySelector('#filters .filter:last-child .f-val')).outlineStyle"
     )
     assert outline == "none"
+
+
+def test_table_enhancements(page: Any, server_url: str) -> None:
+    run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        limit=10,
+    )
+    border = page.evaluate(
+        "getComputedStyle(document.querySelector('#results td')).borderStyle"
+    )
+    assert border == "solid"
+
+    color1 = page.evaluate(
+        "getComputedStyle(document.querySelector('#results tr:nth-child(2) td')).backgroundColor"
+    )
+    color2 = page.evaluate(
+        "getComputedStyle(document.querySelector('#results tr:nth-child(3) td')).backgroundColor"
+    )
+    assert color1 != color2
+
+    page.hover("#results tr:nth-child(2)")
+    hover_color = page.evaluate(
+        "getComputedStyle(document.querySelector('#results tr:nth-child(2) td')).backgroundColor"
+    )
+    assert hover_color != color1
+
+    page.click("#results tr:nth-child(2)")
+    selected_color = page.evaluate(
+        "getComputedStyle(document.querySelector('#results tr:nth-child(2) td')).backgroundColor"
+    )
+    assert "189, 228, 255" in selected_color
+
+    header = page.locator("#results th").nth(0)
+    start = header.bounding_box()
+    resizer = header.locator(".col-resizer")
+    resizer.hover()
+    page.mouse.down()
+    page.mouse.move(start["x"] + start["width"] + 20, start["y"] + 5)
+    page.mouse.up()
+    end_box = header.bounding_box()
+    assert end_box["width"] > start["width"]
