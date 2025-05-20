@@ -293,7 +293,7 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
     f.query_selector(".chip-copy").click()
     assert page.evaluate("navigator.clipboard._data") == "alice,bob"
     page.evaluate(
-        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelector('.chips').innerHTML=''"
+        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelectorAll('.chip').forEach(c=>c.remove())"
     )
     page.wait_for_selector("#filters .chip", state="detached")
     inp.click()
@@ -305,7 +305,7 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
     )
     assert chips[:2] == ["alice", "bob"]
     page.evaluate(
-        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelector('.chips').innerHTML=''"
+        "var f=document.querySelector('#filters .filter:last-child'); f.chips=[]; f.querySelectorAll('.chip').forEach(c=>c.remove())"
     )
     page.wait_for_selector("#filters .chip", state="detached")
     inp.click()
