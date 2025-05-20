@@ -602,7 +602,7 @@ function renderTable(rows) {
       const col = selectedColumns[i];
       const td = document.createElement('td');
       if (isTimeColumn(col)) {
-        const d = new Date(v.replace(' ', 'T'));
+        const d = new Date(v);
         td.textContent = d.toLocaleString('en-US', {
           weekday: 'short',
           month: 'short',

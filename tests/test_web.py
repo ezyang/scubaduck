@@ -388,3 +388,18 @@ def test_table_enhancements(page: Any, server_url: str) -> None:
     page.mouse.up()
     end_box = header.bounding_box()
     assert end_box["width"] > start["width"]
+
+
+def test_timestamp_rendering(page: Any, server_url: str) -> None:
+    run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-02 00:00:00",
+        order_by="timestamp",
+        limit=1,
+    )
+    cell = page.text_content("#results td")
+    assert cell != "Invalid Date"
+    valid = page.evaluate("v => !isNaN(Date.parse(v))", cell)
+    assert valid
