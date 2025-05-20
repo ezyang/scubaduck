@@ -170,14 +170,14 @@ function handleSort(e) {
   const idx = parseInt(e.target.dataset.index, 10);
   if (sortState.index !== idx) {
     sortState.index = idx;
-    sortState.dir = 'desc';
-  } else if (sortState.dir === 'desc') {
     sortState.dir = 'asc';
   } else if (sortState.dir === 'asc') {
+    sortState.dir = 'desc';
+  } else if (sortState.dir === 'desc') {
     sortState.index = null;
     sortState.dir = null;
   } else {
-    sortState.dir = 'desc';
+    sortState.dir = 'asc';
   }
   let rows = originalRows.slice();
   if (sortState.index !== null) {
