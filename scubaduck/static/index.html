@@ -32,7 +32,57 @@
     #filters .filter-row { display: flex; margin-bottom: 5px; }
     #filters .filter-row .f-col { flex: 1; }
     #filters .filter-row .f-op { width: 60px; margin-left: 5px; }
-    #filters .filter input.f-val { width: 100%; box-sizing: border-box; }
+    #filters .filter .chip-area {
+      border: 1px solid #ccc;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 2px;
+      position: relative;
+    }
+    #filters .filter input.f-val {
+      border: none;
+      flex: 1;
+      min-width: 60px;
+      outline: none;
+    }
+    #filters .filter .copy-icon {
+      cursor: pointer;
+      user-select: none;
+      padding: 0 4px;
+    }
+    #filters .filter .chip {
+      background: #eee;
+      border: 1px solid #999;
+      border-radius: 4px;
+      padding: 2px 4px;
+      margin: 2px;
+      display: inline-flex;
+      align-items: center;
+    }
+    #filters .filter .chip .close {
+      margin-left: 4px;
+      cursor: pointer;
+    }
+    #filters .filter .dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      border: 1px solid #ccc;
+      background: white;
+      max-height: 120px;
+      overflow-y: auto;
+      z-index: 10;
+      display: none;
+    }
+    #filters .filter .dropdown div {
+      padding: 2px 4px;
+      cursor: pointer;
+    }
+    #filters .filter .dropdown .highlight {
+      background: #bde4ff;
+    }
     #filters .filter button.remove { position: absolute; top: 2px; right: 2px; }
     #filters h4 { margin: 0 0 5px 0; }
     th { text-align: left; cursor: pointer; }
@@ -107,6 +157,7 @@
   </div>
 <script>
 const columns = [];
+const columnTypes = {};
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
 function updateOrderDirButton() {
@@ -125,6 +176,7 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     o.textContent = c.name;
     orderSelect.appendChild(o);
     columns.push(c.name);
+    columnTypes[c.name] = c.type;
   });
   const list = document.getElementById('column_list');
   cols.forEach(c => {
@@ -171,11 +223,101 @@ function addFilter() {
         <option value=">">></option>
       </select>
     </div>
-    <input class="f-val" type="text">
+    <div class="chip-area">
+      <div class="chips"></div>
+      <input class="f-val" type="text">
+      <span class="copy-icon" title="Copy">\u2398</span>
+      <div class="dropdown"></div>
+    </div>
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
   container.querySelector('.f-col').innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join('');
   document.getElementById('filter_list').appendChild(container);
+  initChipInput(container);
+}
+
+function initChipInput(filter) {
+  const input = filter.querySelector('.f-val');
+  const chipsBox = filter.querySelector('.chips');
+  const dropdown = filter.querySelector('.dropdown');
+  const copyBtn = filter.querySelector('.copy-icon');
+  let items = [];
+  let highlight = 0;
+
+  function renderDropdown() {
+    dropdown.innerHTML = '';
+    items.forEach((v, i) => {
+      const d = document.createElement('div');
+      d.textContent = v;
+      if (i === highlight) d.classList.add('highlight');
+      d.addEventListener('mouseover', () => { highlight = i; renderDropdown(); });
+      d.addEventListener('mousedown', e => { e.preventDefault(); addChip(v); });
+      dropdown.appendChild(d);
+    });
+    dropdown.style.display = items.length ? 'block' : 'none';
+  }
+
+  function fetchItems() {
+    const col = filter.querySelector('.f-col').value;
+    if (!input.value) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    if (!columnTypes[col] || !/CHAR|TEXT|STRING/i.test(columnTypes[col])) {
+      dropdown.style.display = 'none';
+      return;
+    }
+    fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(input.value)}`)
+      .then(r => r.json())
+      .then(res => {
+        items = res.slice();
+        if (input.value) items.splice(1, 0, input.value);
+        highlight = 0;
+        renderDropdown();
+      });
+  }
+
+  function addChip(val) {
+    if (!val) return;
+    const span = document.createElement('span');
+    span.className = 'chip';
+    span.dataset.value = val;
+    span.textContent = val;
+    const close = document.createElement('span');
+    close.className = 'close';
+    close.textContent = 'x';
+    close.addEventListener('click', () => span.remove());
+    span.appendChild(close);
+    chipsBox.appendChild(span);
+    input.value = '';
+    dropdown.style.display = 'none';
+  }
+
+  input.addEventListener('focus', fetchItems);
+  input.addEventListener('input', fetchItems);
+  input.addEventListener('keydown', e => {
+    if (dropdown.style.display === 'block') {
+      if (e.key === 'ArrowDown') { highlight = (highlight + 1) % items.length; renderDropdown(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { highlight = (highlight - 1 + items.length) % items.length; renderDropdown(); e.preventDefault(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (items.length) addChip(items[highlight]); }
+    }
+  });
+
+  input.addEventListener('paste', e => {
+    e.preventDefault();
+    let text = e.clipboardData.getData('text/plain');
+    if (!text) text = e.clipboardData.getData('text');
+    if (e.shiftKey) {
+      addChip(text.trim());
+    } else {
+      text.split(',').forEach(t => { if (t.trim()) addChip(t.trim()); });
+    }
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const vals = Array.from(filter.querySelectorAll('.chip')).map(c => c.dataset.value).join(',');
+    navigator.clipboard.writeText(vals);
+  });
 }
 
 let lastQueryTime = 0;
@@ -191,12 +333,10 @@ function dive() {
     columns
   };
   payload.filters = Array.from(document.querySelectorAll('#filters .filter')).map(f => {
-    const raw = f.querySelector('.f-val').value.trim();
-    if (raw === '') {
-      return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value: null};
-    }
-    const parts = raw.split(/\s+/);
-    const value = parts.length > 1 ? parts : parts[0];
+    const chips = Array.from(f.querySelectorAll('.chip')).map(c => c.dataset.value);
+    let value = null;
+    if (chips.length === 1) value = chips[0];
+    else if (chips.length > 1) value = chips;
     return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value};
   });
   const view = document.getElementById('view');

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, OrderedDict
 
 import duckdb
 from flask import Flask, jsonify, request, send_from_directory
@@ -13,6 +13,23 @@ con = duckdb.connect()
 con.execute(
     "CREATE TABLE IF NOT EXISTS events AS SELECT * FROM read_csv_auto('scubaduck/sample.csv')"
 )
+
+# Column type lookup
+_columns_info = {
+    r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
+}
+
+# Simple LRU cache for sample value queries
+_sample_cache: OrderedDict[tuple[str, str], list[str]] = OrderedDict()
+_CACHE_LIMIT = 100
+
+
+def _is_string_column(col: str) -> bool:
+    typ = _columns_info.get(col, "").upper()
+    for part in ("INT", "DOUBLE", "REAL", "DECIMAL", "NUMERIC", "FLOAT"):
+        if part in typ:
+            return False
+    return True
 
 
 @dataclass
@@ -44,6 +61,25 @@ def index() -> Any:
 def columns() -> Any:
     rows = con.execute("PRAGMA table_info(events)").fetchall()
     return jsonify([{"name": r[1], "type": r[2]} for r in rows])
+
+
+@app.route("/api/samples")
+def sample_values() -> Any:
+    column = request.args.get("column")
+    query = request.args.get("q", "")
+    if not column or not _is_string_column(column):
+        return jsonify([])
+    key = (column, query)
+    if key in _sample_cache:
+        _sample_cache.move_to_end(key)
+        return jsonify(_sample_cache[key])
+    sql = f"SELECT DISTINCT {column} FROM events WHERE {column} ILIKE ? ORDER BY 1 LIMIT 20"
+    rows = con.execute(sql, [f"%{query}%"]).fetchall()
+    values = [r[0] for r in rows]
+    _sample_cache[key] = values
+    if len(_sample_cache) > _CACHE_LIMIT:
+        _sample_cache.popitem(last=False)
+    return jsonify(values)
 
 
 def build_query(params: QueryParams) -> str:

@@ -213,3 +213,93 @@ def test_relative_dropdown(page: Any, server_url: str) -> None:
     btn.click()
     page.select_option("#start-select", "-3 hours")
     assert page.input_value("#start") == "-3 hours"
+
+
+def test_plain_text_not_used(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    filt = page.query_selector("#filters .filter")
+    assert filt
+    filt.query_selector(".f-col").select_option("user")
+    input_el = filt.query_selector(".f-val")
+    input_el.click()
+    page.keyboard.type("alice")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert len(data["rows"]) == 4
+
+
+def test_dropdown_and_arrow_select(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    filt = page.query_selector("#filters .filter")
+    assert filt
+    filt.query_selector(".f-col").select_option("user")
+    input_el = filt.query_selector(".f-val")
+    input_el.click()
+    page.keyboard.type("a")
+    page.wait_for_selector(".dropdown div")
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("Enter")
+    values = page.evaluate(
+        "Array.from(document.querySelectorAll('.chip')).map(c => c.dataset.value)"
+    )
+    assert values == ["a"]
+
+
+def test_copy_and_paste(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    filt = page.query_selector("#filters .filter")
+    assert filt
+    filt.query_selector(".f-col").select_option("user")
+    input_el = filt.query_selector(".f-val")
+    input_el.click()
+    for name in ["alice", "bob"]:
+        page.keyboard.type(name)
+        page.keyboard.press("Enter")
+    page.evaluate("navigator.clipboard.writeText = t => { window.copied = t }")
+    filt.query_selector(".copy-icon").click()
+    copied = page.evaluate("window.copied")
+    assert copied == "alice,bob"
+    page.locator(".chip .close").nth(1).click()
+    page.locator(".chip .close").nth(0).click()
+    page.evaluate(
+        "args => {const el = document.querySelector(args.sel); const dt = new DataTransfer(); dt.setData('text/plain', args.text); el.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt}));}",
+        {"sel": ".f-val", "text": "alice,charlie"},
+    )
+    values = page.evaluate(
+        "Array.from(document.querySelectorAll('.chip')).map(c => c.dataset.value)"
+    )
+    assert values == ["alice", "charlie"]
+
+
+def test_shift_paste(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    filt = page.query_selector("#filters .filter")
+    assert filt
+    filt.query_selector(".f-col").select_option("user")
+    input_el = filt.query_selector(".f-val")
+    input_el.click()
+    page.evaluate(
+        "args => {const el = document.querySelector(args.sel); const dt = new DataTransfer(); dt.setData('text/plain', args.text); const ev = new ClipboardEvent('paste', {clipboardData: dt}); Object.defineProperty(ev, 'shiftKey', {value: true}); el.dispatchEvent(ev);}",
+        {"sel": ".f-val", "text": "x,y"},
+    )
+    values = page.evaluate(
+        "Array.from(document.querySelectorAll('.chip')).map(c => c.dataset.value)"
+    )
+    assert values == ["x,y"]
+
+
+def test_numeric_no_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    filt = page.query_selector("#filters .filter")
+    assert filt
+    filt.query_selector(".f-col").select_option("value")
+    input_el = filt.query_selector(".f-val")
+    input_el.click()
+    page.keyboard.type("1")
+    assert page.query_selector(".dropdown div") is None
