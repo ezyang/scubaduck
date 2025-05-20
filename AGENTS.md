@@ -14,3 +14,6 @@
   "pyright" to typecheck.
 - When writing the PR description, include the original prompt supplied by the
   user.
+- When you add functionality to the server, add server tests to
+  tests/test_server.py.  When you add features to the frontend, add frontend
+  tests to tests/test_web.py
