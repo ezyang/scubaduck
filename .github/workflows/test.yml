@@ -1,4 +1,4 @@
-name: CI
+name: Test
 
 on:
   push:
@@ -18,9 +18,5 @@ jobs:
         run: |
           uv sync --frozen
           playwright install chromium
-      - name: Ruff
-        run: ruff check .
-      - name: Pyright
-        run: pyright
       - name: Pytest
         run: pytest -n auto
