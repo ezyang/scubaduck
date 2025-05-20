@@ -202,3 +202,13 @@ def test_table_sorting(page: Any, server_url: str) -> None:
         "getComputedStyle(document.querySelector('#results th:nth-child(4)')).color"
     )
     assert "0, 0, 255" not in color
+
+
+def test_relative_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    btn = page.query_selector('[data-target="start-select"]')
+    assert btn
+    btn.click()
+    page.select_option("#start-select", "-3 hours")
+    assert page.input_value("#start") == "-3 hours"

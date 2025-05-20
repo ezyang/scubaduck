@@ -12,6 +12,8 @@
     .field { display: flex; align-items: center; margin-bottom: 10px; }
     .field label { width: 80px; text-align: right; margin-right: 5px; }
     .help { margin-left: 4px; cursor: help; }
+    .rel-btn { margin-left: 4px; }
+    .rel-select { margin-left: 4px; }
     #tabs { display: flex; align-items: center; margin-bottom: 10px; }
     #tabs .tab { margin-right: 5px; background: none; border: 1px solid #ccc; padding: 4px 8px; cursor: pointer; width: 120px; text-align: center; box-sizing: border-box; }
     #tabs .tab.active { background: #eee; font-weight: bold; }
@@ -39,10 +41,34 @@
         <div class="field">
           <label>Start<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
           <input id="start" type="text" />
+          <button type="button" class="rel-btn" data-target="start-select">&#9660;</button>
+          <select id="start-select" class="rel-select" data-input="start" style="display:none">
+            <option value="-1 hour">-1 hour</option>
+            <option value="-3 hours">-3 hours</option>
+            <option value="-12 hours">-12 hours</option>
+            <option value="-1 day">-1 day</option>
+            <option value="-3 days">-3 days</option>
+            <option value="-1 week">-1 week</option>
+            <option value="-1 fortnight">-1 fortnight</option>
+            <option value="-30 days">-30 days</option>
+            <option value="-90 days">-90 days</option>
+          </select>
         </div>
         <div class="field">
           <label>End<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
           <input id="end" type="text" />
+          <button type="button" class="rel-btn" data-target="end-select">&#9660;</button>
+          <select id="end-select" class="rel-select" data-input="end" style="display:none">
+            <option value="-1 hour">-1 hour</option>
+            <option value="-3 hours">-3 hours</option>
+            <option value="-12 hours">-12 hours</option>
+            <option value="-1 day">-1 day</option>
+            <option value="-3 days">-3 days</option>
+            <option value="-1 week">-1 week</option>
+            <option value="-1 fortnight">-1 fortnight</option>
+            <option value="-30 days">-30 days</option>
+            <option value="-90 days">-90 days</option>
+          </select>
         </div>
         <div class="field">
           <label>Order By<span class="help" title="Choose a column to sort results by.">[?]</span></label>
@@ -97,6 +123,20 @@ document.querySelectorAll('#tabs .tab').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.querySelectorAll('.rel-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sel = document.getElementById(btn.dataset.target);
+    sel.style.display = sel.style.display === 'none' ? 'block' : 'none';
+  });
+});
+document.querySelectorAll('.rel-select').forEach(sel => {
+  sel.addEventListener('change', () => {
+    const input = document.getElementById(sel.dataset.input);
+    input.value = sel.value;
+    sel.style.display = 'none';
   });
 });
 
