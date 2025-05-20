@@ -21,7 +21,18 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
     #filter_list { display: flex; flex-direction: column; }
-    #filters .filter { border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; position: relative; }
+    #filters .filter {
+      border: 1px solid #ccc;
+      padding: 5px;
+      margin-bottom: 5px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #filters .filter-row { display: flex; margin-bottom: 5px; }
+    #filters .filter-row .f-col { flex: 1; }
+    #filters .filter-row .f-op { width: 60px; margin-left: 5px; }
+    #filters .filter input.f-val { width: 100%; box-sizing: border-box; }
     #filters .filter button.remove { position: absolute; top: 2px; right: 2px; }
     #filters h4 { margin: 0 0 5px 0; }
     th { text-align: left; cursor: pointer; }
@@ -73,10 +84,7 @@
         <div class="field">
           <label>Order By<span class="help" title="Choose a column to sort results by.">[?]</span></label>
           <select id="order_by"></select>
-          <select id="order_dir">
-            <option value="ASC">ASC</option>
-            <option value="DESC">DESC</option>
-          </select>
+          <button id="order_dir" type="button">ASC \u25B2</button>
         </div>
         <div class="field">
           <label>Limit<span class="help" title="Choose the maximum number of results to show in the chart after any aggregations have been applied. For example, a limit of 10 will show no more than 10 rows for a table, etc.">[?]</span></label>
@@ -100,7 +108,17 @@
   </div>
 <script>
 const allColumns = [];
-let columns = [];
+const columns = [];
+let orderDir = 'ASC';
+const orderDirBtn = document.getElementById('order_dir');
+function updateOrderDirButton() {
+  orderDirBtn.textContent = orderDir + (orderDir === 'ASC' ? ' \u25B2' : ' \u25BC');
+}
+orderDirBtn.addEventListener('click', () => {
+  orderDir = orderDir === 'ASC' ? 'DESC' : 'ASC';
+  updateOrderDirButton();
+});
+updateOrderDirButton();
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
   cols.forEach(c => {
@@ -153,13 +171,15 @@ function addFilter() {
   const container = document.createElement('div');
   container.className = 'filter';
   container.innerHTML = `
-    <select class="f-col"></select>
-    <select class="f-op">
-      <option value="=">=</option>
-      <option value="!=">!=</option>
-      <option value="<"><</option>
-      <option value=">">></option>
-    </select>
+    <div class="filter-row">
+      <select class="f-col"></select>
+      <select class="f-op">
+        <option value="=">=</option>
+        <option value="!=">!=</option>
+        <option value="<"><</option>
+        <option value=">">></option>
+      </select>
+    </div>
     <input class="f-val" type="text">
     <button type="button" class="remove" onclick="this.parentElement.remove()">X</button>
   `;
@@ -178,7 +198,7 @@ function dive() {
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
-    order_dir: document.getElementById('order_dir').value,
+    order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
     columns
   };

@@ -15,14 +15,15 @@ def run_query(
 ) -> dict[str, Any]:
     page.goto(url)
     page.wait_for_selector("#order_by option", state="attached")
+    page.wait_for_selector("#order_dir", state="attached")
     if start is not None:
         page.fill("#start", start)
     if end is not None:
         page.fill("#end", end)
     if order_by is not None:
         page.select_option("#order_by", order_by)
-    if order_dir is not None:
-        page.select_option("#order_dir", order_dir)
+    if order_dir is not None and order_dir == "DESC":
+        page.click("#order_dir")
     if limit is not None:
         page.fill("#limit", str(limit))
     page.evaluate("window.lastResults = undefined")
