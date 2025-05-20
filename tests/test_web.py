@@ -316,3 +316,16 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
         "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
     )
     assert chips[-1] == "alice,bob"
+
+
+def test_chip_input_no_outline(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    inp = page.query_selector("#filters .filter:last-child .f-val")
+    assert inp
+    inp.click()
+    outline = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .f-val')).outlineStyle"
+    )
+    assert outline == "none"
