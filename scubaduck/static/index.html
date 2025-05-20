@@ -59,6 +59,7 @@
             <button type="button" onclick="addFilter()">Add Filter</button>
           </div>
         </div>
+        <div id="query_info" style="margin-top:10px;"></div>
       </div>
       <div id="columns" class="tab-content">
         <ul id="column_list"></ul>
@@ -114,6 +115,9 @@ function addFilter() {
   document.getElementById('filter_list').appendChild(container);
 }
 
+let lastQueryTime = 0;
+let queryStart = 0;
+
 function dive() {
   const payload = {
     start: document.getElementById('start').value,
@@ -132,9 +136,15 @@ function dive() {
     const value = parts.length > 1 ? parts : parts[0];
     return {column: f.querySelector('.f-col').value, op: f.querySelector('.f-op').value, value};
   });
+  const view = document.getElementById('view');
+  view.innerHTML = '<p>Loading...</p>';
+  queryStart = performance.now();
   fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(r=>r.json())
-    .then(showResults);
+    .then(data => {
+      lastQueryTime = Math.round(performance.now() - queryStart);
+      showResults(data);
+    });
 }
 
 let originalRows = [];
@@ -194,9 +204,13 @@ function handleSort(e) {
 
 function showResults(data) {
   window.lastResults = data;
+  const view = document.getElementById('view');
+  view.innerHTML = '<table id="results"></table>';
   originalRows = data.rows.slice();
   sortState = {index: null, dir: null};
   renderTable(originalRows);
+  document.getElementById('query_info').textContent =
+    `Your query took about ${lastQueryTime} ms`;
 }
 </script>
 </body>
