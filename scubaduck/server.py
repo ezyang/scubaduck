@@ -243,6 +243,12 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         assert app.static_folder is not None
         return send_from_directory(app.static_folder, "index.html")
 
+    @app.route("/js/<path:filename>")
+    def js(filename: str) -> Any:  # pyright: ignore[reportUnusedFunction]
+        assert app.static_folder is not None
+        folder = Path(app.static_folder) / "js"
+        return send_from_directory(folder, filename)
+
     @app.route("/api/columns")
     def columns() -> Any:  # pyright: ignore[reportUnusedFunction]
         rows = con.execute("PRAGMA table_info(events)").fetchall()

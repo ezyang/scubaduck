@@ -32,6 +32,14 @@ def test_basic_query() -> None:
     assert rows[1][1] == "logout"
 
 
+def test_js_served() -> None:
+    app = server.app
+    client = app.test_client()
+    rv = client.get("/js/chip_input.js")
+    assert rv.status_code == 200
+    assert b"initChipInput" in rv.data
+
+
 def test_filter_multi_token() -> None:
     app = server.app
     client = app.test_client()
