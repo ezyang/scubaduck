@@ -524,6 +524,28 @@ function isTimeColumn(name) {
   return t.includes('TIMESTAMP');
 }
 
+function formatNumber(val) {
+  if (typeof val !== 'number') val = Number(val);
+  if (Number.isNaN(val)) return '';
+  if (val === 0) return '0';
+  const abs = Math.abs(val);
+  if (abs > 999.999) {
+    const units = [
+      {n: 1e12, s: 'T'},
+      {n: 1e9, s: 'B'},
+      {n: 1e6, s: 'M'},
+      {n: 1e3, s: 'K'},
+    ];
+    for (const u of units) {
+      if (abs >= u.n) {
+        return (val / u.n).toFixed(2) + ' ' + u.s;
+      }
+    }
+  }
+  if (abs < 0.0005) return '0.000';
+  return val.toFixed(3);
+}
+
 function initChipInput(filter, fetchOptions) {
   const input = filter.querySelector('.f-val');
   const chipsEl = filter.querySelector('.chip-input');
@@ -963,9 +985,9 @@ function renderTable(rows) {
       } else {
         if (col === 'Hits') {
           const pct = totalHits ? ((v / totalHits) * 100).toFixed(1) : '0';
-          td.textContent = `${v} (${pct}%)`;
+          td.textContent = `${formatNumber(v)} (${pct}%)`;
         } else {
-          td.textContent = v;
+          td.textContent = isStringColumn(col) ? v : formatNumber(v);
         }
       }
       td.style.textAlign = isStringColumn(col) ? 'left' : 'right';

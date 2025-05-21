@@ -782,3 +782,12 @@ def test_table_headers_show_aggregate(page: Any, server_url: str) -> None:
     assert "Hits" in headers
     assert "timestamp (avg)" in headers
     assert "value (avg)" in headers
+
+
+def test_format_number_function(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    vals = page.evaluate(
+        "() => [formatNumber(815210), formatNumber(999.999), formatNumber(0.0004), formatNumber(0)]"
+    )
+    assert vals == ["815.21 K", "999.999", "0.000", "0"]
