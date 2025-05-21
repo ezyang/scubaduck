@@ -888,3 +888,18 @@ def test_derived_column_remove(page: Any, server_url: str) -> None:
     page.click("#derived_list .derived button.remove")
     count = page.evaluate("document.querySelectorAll('#derived_list .derived').length")
     assert count == 0
+
+
+def test_sql_query_display(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-02 00:00:00",
+        order_by="timestamp",
+        limit=10,
+    )
+    sql = data["sql"]
+    displayed = page.text_content("#sql_query")
+    assert displayed is not None
+    assert displayed.strip() == sql
