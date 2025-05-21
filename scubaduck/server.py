@@ -11,6 +11,7 @@ from pathlib import Path
 import os
 import sqlite3
 import traceback
+import math
 
 import duckdb
 from dateutil import parser as dtparser
@@ -528,6 +529,21 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 params.start if isinstance(params.start, str) else None,
                 params.end if isinstance(params.end, str) else None,
             )
+            if (
+                params.limit is not None
+                and params.start is not None
+                and params.end is not None
+            ):
+                try:
+                    start_dt = dtparser.parse(params.start)
+                    end_dt = dtparser.parse(params.end)
+                    buckets = math.ceil(
+                        (end_dt - start_dt).total_seconds() / bucket_size
+                    )
+                    if buckets > 1:
+                        params.limit *= buckets
+                except Exception:
+                    pass
 
         sql = build_query(params, column_types)
         try:
