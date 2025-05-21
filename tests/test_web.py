@@ -210,6 +210,19 @@ def test_timeseries_default_query(page: Any, server_url: str) -> None:
     assert not page.is_checked("#column_groups input[value='timestamp']")
 
 
+def test_timeseries_single_bucket(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-01 00:00:00")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    path = page.get_attribute("#chart path", "d")
+    assert path is not None and "NaN" not in path
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
