@@ -322,6 +322,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             )
 
         valid_cols = set(column_types.keys())
+        valid_cols.update(params.derived_columns.keys())
         if params.graph_type == "timeseries":
             if params.x_axis is None:
                 for cand in ["time", "timestamp"]:
@@ -356,6 +357,8 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             if need_numeric or allow_time:
                 for c in params.columns:
                     if c in params.group_by or c == params.x_axis:
+                        continue
+                    if c not in column_types:
                         continue
                     ctype = column_types.get(c, "").upper()
                     is_numeric = any(

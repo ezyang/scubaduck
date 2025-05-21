@@ -29,6 +29,25 @@
       display: flex;
       flex-direction: column;
     }
+    #derived_columns .derived {
+      border: 1px solid #ccc;
+      padding: 5px;
+      margin-bottom: 5px;
+      display: flex;
+      flex-direction: column;
+    }
+    #derived_columns .derived-row {
+      display: flex;
+      margin-bottom: 5px;
+    }
+    #derived_columns .derived-row input[type="text"] {
+      margin-left: 5px;
+      flex: 1;
+    }
+    #derived_columns textarea {
+      width: 100%;
+      box-sizing: border-box;
+    }
     #filters .filter-row { display: flex; margin-bottom: 5px; }
     #filters .filter-row .f-col { flex: 1; }
     #filters .filter-row .f-op {
@@ -249,6 +268,11 @@
           <a id="columns_none" href="#">None</a>
         </div>
         <div id="column_groups"></div>
+        <div id="derived_columns">
+          <h4>Derived Columns</h4>
+          <div id="derived_list"></div>
+          <button id="add_derived" type="button" onclick="addDerived()">Add Derived</button>
+        </div>
       </div>
     </div>
     <div id="sidebar-resizer"></div>
@@ -258,10 +282,15 @@
   </div>
 <script>
 const allColumns = [];
+const baseColumns = [];
 const columnTypes = {};
 const stringColumns = [];
+const baseStringColumns = [];
 const integerColumns = [];
+const baseIntegerColumns = [];
 const timeColumns = [];
+const baseTimeColumns = [];
+const derivedColumns = [];
 let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
@@ -426,11 +455,20 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     const t = c.type.toUpperCase();
     columnTypes[c.name] = c.type;
     allColumns.push(c.name);
+    baseColumns.push(c.name);
     let g = 'string';
     if (t.includes('INT')) g = 'integer';
     if (t.includes('TIMESTAMP')) {
       g = 'time';
       timeColumns.push(c.name);
+      baseTimeColumns.push(c.name);
+    }
+    if (g === 'string') {
+      stringColumns.push(c.name);
+      baseStringColumns.push(c.name);
+    } else {
+      integerColumns.push(c.name);
+      baseIntegerColumns.push(c.name);
     }
     groups[g].cols.push(c.name);
     if (g !== 'string') {
@@ -562,8 +600,14 @@ function updateSelectedColumns() {
     base.forEach(c => {
       if (!selectedColumns.includes(c)) selectedColumns.push(c);
     });
+    derivedColumns.forEach(dc => {
+      if (dc.include && !selectedColumns.includes(dc.name)) selectedColumns.push(dc.name);
+    });
   } else {
-    selectedColumns = base;
+    selectedColumns = base.slice();
+    derivedColumns.forEach(dc => {
+      if (dc.include) selectedColumns.push(dc.name);
+    });
   }
 }
 
@@ -835,14 +879,84 @@ function addFilter() {
   });
 }
 
+function nextDerivedName() {
+  let n = 1;
+  while (true) {
+    const name = `derived_${n}`;
+    if (!derivedColumns.some(d => d.name === name) && !allColumns.includes(name)) return name;
+    n++;
+  }
+}
+
+function addDerived(data = {}) {
+  const container = document.createElement('div');
+  container.className = 'derived';
+  container.innerHTML = `
+    <div class="derived-row">
+      <select class="d-type">
+        <option value="aggregated">Aggregated</option>
+        <option value="string">String</option>
+        <option value="numeric">Numeric</option>
+      </select>
+      <input class="d-name" type="text">
+    </div>
+    <label><input type="checkbox" class="d-use" checked> Include in Query</label>
+    <textarea class="d-expr" rows="2"></textarea>
+  `;
+  document.getElementById('derived_list').appendChild(container);
+  const obj = {
+    type: data.type || 'string',
+    name: data.name || nextDerivedName(),
+    expr: data.expr || '',
+    include: data.include !== undefined ? data.include : true,
+    el: container
+  };
+  container.querySelector('.d-type').value = obj.type;
+  container.querySelector('.d-name').value = obj.name;
+  container.querySelector('.d-expr').value = obj.expr;
+  container.querySelector('.d-use').checked = obj.include;
+  ['change','input'].forEach(evt => {
+    container.addEventListener(evt, refreshDerivedColumns);
+  });
+  derivedColumns.push(obj);
+  refreshDerivedColumns();
+}
+
+function refreshDerivedColumns() {
+  allColumns.splice(0, allColumns.length, ...baseColumns);
+  stringColumns.splice(0, stringColumns.length, ...baseStringColumns);
+  integerColumns.splice(0, integerColumns.length, ...baseIntegerColumns);
+  timeColumns.splice(0, timeColumns.length, ...baseTimeColumns);
+  derivedColumns.forEach(d => {
+    d.type = d.el.querySelector('.d-type').value;
+    d.name = d.el.querySelector('.d-name').value;
+    d.expr = d.el.querySelector('.d-expr').value;
+    d.include = d.el.querySelector('.d-use').checked;
+    allColumns.push(d.name);
+    columnTypes[d.name] = d.type;
+    if (d.type === 'string') {
+      stringColumns.push(d.name);
+    } else {
+      integerColumns.push(d.name);
+    }
+  });
+  updateSelectedColumns();
+}
+
 let lastQueryTime = 0;
 let queryStart = 0;
 
 function dive(push=true) {
-  const payload = collectParams();
+  const params = collectParams();
   if (push) {
-    history.pushState(payload, '', paramsToSearch(payload));
+    history.pushState(params, '', paramsToSearch(params));
   }
+  const payload = Object.assign({}, params);
+  const dcMap = {};
+  (params.derived_columns || []).forEach(d => {
+    if (d.include) dcMap[d.name] = d.expr;
+  });
+  payload.derived_columns = dcMap;
   const view = document.getElementById('view');
   view.innerHTML = '<p>Loading...</p>';
   window.lastResults = undefined;
@@ -870,7 +984,9 @@ function collectParams() {
     order_by: document.getElementById('order_by').value,
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
-    columns: selectedColumns.filter(c => c !== 'Hits'),
+    columns: selectedColumns.filter(c =>
+      c !== 'Hits' && !derivedColumns.some(dc => dc.name === c)
+    ),
     graph_type: graphTypeSel.value,
     filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
       const chips = f.chips || [];
@@ -881,7 +997,13 @@ function collectParams() {
       }
       const colSel = f.querySelector('.f-col select') || f.querySelector('.f-col');
       return {column: colSel.value, op, value};
-    })
+    }),
+    derived_columns: Array.from(document.querySelectorAll('#derived_list .derived')).map(d => ({
+      type: d.querySelector('.d-type').value,
+      name: d.querySelector('.d-name').value,
+      expr: d.querySelector('.d-expr').value,
+      include: d.querySelector('.d-use').checked,
+    }))
   };
   if (graphTypeSel.value === 'table' || graphTypeSel.value === 'timeseries') {
     payload.group_by = groupBy.chips || [];
@@ -905,6 +1027,7 @@ function paramsToSearch(params) {
   if (params.limit !== null && params.limit !== undefined) sp.set('limit', params.limit);
   if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
   if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
+  if (params.derived_columns && params.derived_columns.length) sp.set('derived_columns', JSON.stringify(params.derived_columns));
   if (params.graph_type) sp.set('graph_type', params.graph_type);
   if (params.graph_type === 'table' || params.graph_type === 'timeseries') {
     if (params.group_by && params.group_by.length) sp.set('group_by', params.group_by.join(','));
@@ -946,6 +1069,13 @@ function applyParams(params) {
     cb.checked = !params.columns || params.columns.includes(cb.value);
   });
   updateSelectedColumns();
+  const dlist = document.getElementById('derived_list');
+  dlist.innerHTML = '';
+  derivedColumns.splice(0, derivedColumns.length);
+  if (params.derived_columns && params.derived_columns.length) {
+    params.derived_columns.forEach(dc => addDerived(dc));
+  }
+  refreshDerivedColumns();
   const list = document.getElementById('filter_list');
   list.innerHTML = '';
   if (params.filters && params.filters.length) {
@@ -987,6 +1117,9 @@ function parseSearch() {
   if (sp.has('x_axis')) params.x_axis = sp.get('x_axis');
   if (sp.has('granularity')) params.granularity = sp.get('granularity');
   if (sp.has('fill')) params.fill = sp.get('fill');
+  if (sp.has('derived_columns')) {
+    try { params.derived_columns = JSON.parse(sp.get('derived_columns')); } catch(e) { params.derived_columns = []; }
+  }
   return params;
 }
 
