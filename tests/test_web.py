@@ -253,6 +253,30 @@ def test_timeseries_fill_options(page: Any, server_url: str) -> None:
     assert path_blank is not None and path_blank.count("M") > 1
 
 
+def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart path", state="attached")
+    path_el = page.query_selector("#chart path")
+    assert path_el
+    page.evaluate(
+        "el => el.dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}))",
+        path_el,
+    )
+    width = page.evaluate(
+        "getComputedStyle(document.querySelector('#chart path')).strokeWidth"
+    )
+    assert "3" in width
+    color = page.evaluate(
+        "getComputedStyle(document.querySelector('#legend div')).backgroundColor"
+    )
+    assert "221, 221, 221" in color
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
