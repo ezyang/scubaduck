@@ -41,6 +41,7 @@ class QueryParams:
     x_axis: str | None = None
     granularity: str = "Auto"
     fill: str = "0"
+    table: str = "events"
 
 
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
@@ -55,14 +56,33 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
         )
     elif ext in {".db", ".sqlite"}:
         con = duckdb.connect()
-        sconn = sqlite3.connect(path)
-        info = sconn.execute("PRAGMA table_info(events)").fetchall()
-        col_defs = ", ".join(f"{r[1]} {r[2]}" for r in info)
-        con.execute(f"CREATE TABLE events ({col_defs})")
-        placeholders = ",".join("?" for _ in info)
-        for row in sconn.execute("SELECT * FROM events"):
-            con.execute(f"INSERT INTO events VALUES ({placeholders})", row)
-        sconn.close()
+        try:
+            con.execute("LOAD sqlite")
+            con.execute(f"ATTACH '{path.as_posix()}' AS db (TYPE SQLITE)")
+            tables = [
+                r[0]
+                for r in con.execute(
+                    "SELECT name FROM db.sqlite_master WHERE type='table'"
+                ).fetchall()
+            ]
+            for t in tables:
+                con.execute(f'CREATE VIEW "{t}" AS SELECT * FROM db."{t}"')
+        except Exception:
+            sconn = sqlite3.connect(path)
+            tables = [
+                r[0]
+                for r in sconn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            ]
+            for t in tables:
+                info = sconn.execute(f'PRAGMA table_info("{t}")').fetchall()
+                col_defs = ", ".join(f"{r[1]} {r[2]}" for r in info)
+                con.execute(f'CREATE TABLE "{t}" ({col_defs})')
+                placeholders = ",".join("?" for _ in info)
+                for row in sconn.execute(f'SELECT * FROM "{t}"'):
+                    con.execute(f'INSERT INTO "{t}" VALUES ({placeholders})', row)
+            sconn.close()
     else:
         con = duckdb.connect(path)
     return con
@@ -206,7 +226,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
-    query = f"SELECT {select_clause} FROM events"
+    query = f'SELECT {select_clause} FROM "{params.table}"'
     where_parts: list[str] = []
     if params.start:
         where_parts.append(f"timestamp >= '{params.start}'")
@@ -259,11 +279,21 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             db_file = env_db
     db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
     con = _load_database(db_path)
-    column_types: Dict[str, str] = {
-        r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
-    }
+    tables = [r[0] for r in con.execute("SHOW TABLES").fetchall()]
+    if not tables:
+        raise ValueError("No tables found in database")
+    default_table = tables[0]
+    columns_cache: Dict[str, Dict[str, str]] = {}
 
-    sample_cache: Dict[Tuple[str, str], Tuple[List[str], float]] = {}
+    def get_columns(table: str) -> Dict[str, str]:
+        if table not in columns_cache:
+            rows = con.execute(f'PRAGMA table_info("{table}")').fetchall()
+            if not rows:
+                raise ValueError(f"Unknown table: {table}")
+            columns_cache[table] = {r[1]: r[2] for r in rows}
+        return columns_cache[table]
+
+    sample_cache: Dict[Tuple[str, str, str], Tuple[List[str], float]] = {}
     CACHE_TTL = 60.0
     CACHE_LIMIT = 200
 
@@ -278,12 +308,17 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         folder = Path(app.static_folder) / "js"
         return send_from_directory(folder, filename)
 
+    @app.route("/api/tables")
+    def tables_endpoint() -> Any:  # pyright: ignore[reportUnusedFunction]
+        return jsonify(tables)
+
     @app.route("/api/columns")
     def columns() -> Any:  # pyright: ignore[reportUnusedFunction]
-        rows = con.execute("PRAGMA table_info(events)").fetchall()
+        table = request.args.get("table", default_table)
+        rows = con.execute(f'PRAGMA table_info("{table}")').fetchall()
         return jsonify([{"name": r[1], "type": r[2]} for r in rows])
 
-    def _cache_get(key: Tuple[str, str]) -> List[str] | None:
+    def _cache_get(key: Tuple[str, str, str]) -> List[str] | None:
         item = sample_cache.get(key)
         if item is None:
             return None
@@ -294,7 +329,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         sample_cache[key] = (vals, time.time())
         return vals
 
-    def _cache_set(key: Tuple[str, str], vals: List[str]) -> None:
+    def _cache_set(key: Tuple[str, str, str], vals: List[str]) -> None:
         sample_cache[key] = (vals, time.time())
         if len(sample_cache) > CACHE_LIMIT:
             oldest = min(sample_cache.items(), key=lambda kv: kv[1][1])[0]
@@ -302,19 +337,21 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
     @app.route("/api/samples")
     def sample_values() -> Any:  # pyright: ignore[reportUnusedFunction]
+        table = request.args.get("table", default_table)
         column = request.args.get("column")
         substr = request.args.get("q", "")
+        column_types = get_columns(table)
         if not column or column not in column_types:
             return jsonify([])
         ctype = column_types[column].upper()
         if "CHAR" not in ctype and "STRING" not in ctype and "VARCHAR" not in ctype:
             return jsonify([])
-        key = (column, substr)
+        key = (table, column, substr)
         cached = _cache_get(key)
         if cached is not None:
             return jsonify(cached)
         rows = con.execute(
-            f"SELECT DISTINCT {column} FROM events WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
+            f"SELECT DISTINCT {column} FROM \"{table}\" WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
             [substr],
         ).fetchall()
         values = [r[0] for r in rows]
@@ -345,9 +382,15 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             x_axis=payload.get("x_axis"),
             granularity=payload.get("granularity", "Auto"),
             fill=payload.get("fill", "0"),
+            table=payload.get("table", default_table),
         )
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
+
+        if params.table not in tables:
+            return jsonify({"error": "Invalid table"}), 400
+
+        column_types = get_columns(params.table)
 
         if params.graph_type not in {"table", "timeseries"} and (
             params.group_by or params.aggregate or params.show_hits
@@ -436,9 +479,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             axis = params.x_axis or "timestamp"
             row = cast(
                 tuple[datetime | None, datetime | None],
-                con.execute(f"SELECT min({axis}), max({axis}) FROM events").fetchall()[
-                    0
-                ],
+                con.execute(
+                    f'SELECT min({axis}), max({axis}) FROM "{params.table}"'
+                ).fetchall()[0],
             )
             mn, mx = row
             if params.start is None and mn is not None:
