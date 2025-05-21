@@ -37,6 +37,9 @@ class QueryParams:
     group_by: list[str] = field(default_factory=lambda: [])
     aggregate: str | None = None
     show_hits: bool = False
+    x_axis: str | None = None
+    granularity: str = "Auto"
+    fill: str = "0"
 
 
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
@@ -98,11 +101,55 @@ def parse_time(val: str | None) -> str | None:
     return dt.replace(microsecond=0, tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _granularity_seconds(granularity: str, start: str | None, end: str | None) -> int:
+    gran = granularity.lower()
+    mapping = {
+        "1 second": 1,
+        "5 seconds": 5,
+        "10 seconds": 10,
+        "30 seconds": 30,
+        "1 minute": 60,
+        "4 minutes": 240,
+        "5 minutes": 300,
+        "10 minutes": 600,
+        "15 minutes": 900,
+        "30 minutes": 1800,
+        "1 hour": 3600,
+        "3 hours": 10800,
+        "6 hours": 21600,
+        "1 day": 86400,
+        "1 week": 604800,
+        "30 days": 2592000,
+    }
+    if gran in mapping:
+        return mapping[gran]
+    if gran in {"auto", "fine"} and start and end:
+        try:
+            s = dtparser.parse(start)
+            e = dtparser.parse(end)
+        except Exception:
+            return 3600
+        total = max((e - s).total_seconds(), 1)
+        buckets = 100 if gran == "auto" else 500
+        return max(int(total // buckets), 1)
+    return 3600
+
+
 def build_query(params: QueryParams, column_types: Dict[str, str] | None = None) -> str:
     select_parts: list[str] = []
-    has_agg = bool(params.group_by) or params.aggregate is not None
+    group_cols = params.group_by[:]
+    if params.graph_type == "timeseries":
+        sec = _granularity_seconds(params.granularity, params.start, params.end)
+        x_axis = params.x_axis or "timestamp"
+        bucket_expr = (
+            f"TIMESTAMP 'epoch' + INTERVAL '{sec} second' * "
+            f"CAST(floor(epoch({x_axis})/{sec}) AS BIGINT)"
+        )
+        select_parts.append(f"{bucket_expr} AS bucket")
+        group_cols = ["bucket"] + group_cols
+    has_agg = bool(group_cols) or params.aggregate is not None
     if has_agg:
-        select_parts.extend(params.group_by)
+        select_parts.extend(group_cols)
         agg = (params.aggregate or "avg").lower()
 
         def agg_expr(col: str) -> str:
@@ -121,11 +168,11 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             return f"{agg}({col})"
 
         for col in params.columns:
-            if col in params.group_by:
+            if col in group_cols:
                 continue
             select_parts.append(f"{agg_expr(col)} AS {col}")
         if params.show_hits:
-            select_parts.insert(len(params.group_by), "count(*) AS Hits")
+            select_parts.insert(len(group_cols), "count(*) AS Hits")
     else:
         select_parts.extend(params.columns)
     for name, expr in params.derived_columns.items():
@@ -165,8 +212,8 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             where_parts.append(f"{f.column} {op} {val}")
     if where_parts:
         query += " WHERE " + " AND ".join(where_parts)
-    if params.group_by:
-        query += " GROUP BY " + ", ".join(params.group_by)
+    if group_cols:
+        query += " GROUP BY " + ", ".join(group_cols)
     if params.order_by:
         query += f" ORDER BY {params.order_by} {params.order_dir}"
     if params.limit is not None:
@@ -255,23 +302,37 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             group_by=payload.get("group_by", []),
             aggregate=payload.get("aggregate"),
             show_hits=payload.get("show_hits", False),
+            x_axis=payload.get("x_axis"),
+            granularity=payload.get("granularity", "Auto"),
+            fill=payload.get("fill", "0"),
         )
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
 
-        if params.graph_type != "table" and (
+        if params.graph_type not in {"table", "timeseries"} and (
             params.group_by or params.aggregate or params.show_hits
         ):
             return (
                 jsonify(
                     {
-                        "error": "group_by, aggregate and show_hits are only valid for table view"
+                        "error": "group_by, aggregate and show_hits are only valid for table or timeseries view"
                     }
                 ),
                 400,
             )
 
         valid_cols = set(column_types.keys())
+        if params.graph_type == "timeseries":
+            if params.x_axis is None:
+                for cand in ["time", "timestamp"]:
+                    if cand in valid_cols:
+                        params.x_axis = cand
+                        break
+            if params.x_axis is None or params.x_axis not in valid_cols:
+                return jsonify({"error": "Invalid x_axis"}), 400
+            ctype = column_types.get(params.x_axis, "").upper()
+            if not any(t in ctype for t in ["TIMESTAMP", "DATE", "TIME"]):
+                return jsonify({"error": "x_axis must be a time column"}), 400
         for col in params.columns:
             if col not in valid_cols:
                 return jsonify({"error": f"Unknown column: {col}"}), 400
@@ -294,7 +355,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 allow_time = False
             if need_numeric or allow_time:
                 for c in params.columns:
-                    if c in params.group_by:
+                    if c in params.group_by or c == params.x_axis:
                         continue
                     ctype = column_types.get(c, "").upper()
                     is_numeric = any(

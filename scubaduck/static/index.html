@@ -111,7 +111,7 @@
   </style>
 </head>
 <body>
-  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option></select></div>
+  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
   <div id="content">
     <div id="sidebar">
       <div id="tabs">
@@ -165,6 +165,41 @@
         <div class="field">
           <label>Limit<span class="help" title="Choose the maximum number of results to show in the chart after any aggregations have been applied. For example, a limit of 10 will show no more than 10 rows for a table, etc.">[?]</span></label>
           <input id="limit" type="number" value="100" />
+        </div>
+        <div id="x_axis_field" class="field" style="display:none;">
+          <label>X-axis</label>
+          <select id="x_axis"></select>
+        </div>
+        <div id="granularity_field" class="field" style="display:none;">
+          <label>Granularity</label>
+          <select id="granularity">
+            <option>Auto</option>
+            <option>Fine</option>
+            <option>1 second</option>
+            <option>5 seconds</option>
+            <option>10 seconds</option>
+            <option>30 seconds</option>
+            <option>1 minute</option>
+            <option>4 minutes</option>
+            <option>5 minutes</option>
+            <option>10 minutes</option>
+            <option>15 minutes</option>
+            <option>30 minutes</option>
+            <option>1 hour</option>
+            <option>3 hours</option>
+            <option>6 hours</option>
+            <option>1 day</option>
+            <option>1 week</option>
+            <option>30 days</option>
+          </select>
+        </div>
+        <div id="fill_field" class="field" style="display:none;">
+          <label>Fill Missing Buckets</label>
+          <select id="fill">
+            <option value="0">Fill with 0 (Per Series)</option>
+            <option value="connect">Connect (Per Series)</option>
+            <option value="blank">Leave blank</option>
+          </select>
         </div>
         <div id="group_by_field" class="field" style="display:none;">
           <label>Group By</label>
@@ -351,15 +386,25 @@ function updateOrderDirButton() {
 }
 
 function updateDisplayTypeUI() {
-  const show = graphTypeSel.value === 'table';
-  document.getElementById('group_by_field').style.display = show ? 'flex' : 'none';
-  document.getElementById('aggregate_field').style.display = show ? 'flex' : 'none';
-  document.getElementById('show_hits_field').style.display = show ? 'flex' : 'none';
+  const showTable = graphTypeSel.value === 'table';
+  const showTS = graphTypeSel.value === 'timeseries';
+  document.getElementById('group_by_field').style.display = showTable || showTS ? 'flex' : 'none';
+  document.getElementById('aggregate_field').style.display = showTable || showTS ? 'flex' : 'none';
+  document.getElementById('show_hits_field').style.display = showTable ? 'flex' : 'none';
+  document.getElementById('x_axis_field').style.display = showTS ? 'flex' : 'none';
+  document.getElementById('granularity_field').style.display = showTS ? 'flex' : 'none';
+  document.getElementById('fill_field').style.display = showTS ? 'flex' : 'none';
   document.querySelectorAll('#column_groups .col-group').forEach(g => {
     if (g.querySelector('.col-group-header').textContent.startsWith('Strings')) {
-      g.style.display = show ? 'none' : '';
+      g.style.display = showTable || showTS ? 'none' : '';
     }
   });
+  if (showTS) {
+    const lim = document.getElementById('limit');
+    if (!lim.dataset.setByUser) {
+      lim.value = '7';
+    }
+  }
   displayType = graphTypeSel.value;
 }
 orderDirBtn.addEventListener('click', () => {
@@ -370,6 +415,7 @@ updateOrderDirButton();
 graphTypeSel.addEventListener('change', updateDisplayTypeUI);
 fetch('/api/columns').then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
+  const xAxisSelect = document.getElementById('x_axis');
   const groupsEl = document.getElementById('column_groups');
   const groups = {
     time: {name: 'Time', cols: [], ul: null},
@@ -382,7 +428,10 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
     allColumns.push(c.name);
     let g = 'string';
     if (t.includes('INT')) g = 'integer';
-    if (t.includes('TIMESTAMP')) g = 'time';
+    if (t.includes('TIMESTAMP')) {
+      g = 'time';
+      timeColumns.push(c.name);
+    }
     groups[g].cols.push(c.name);
     if (g !== 'string') {
       const o = document.createElement('option');
@@ -390,6 +439,12 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
       o.textContent = c.name;
       orderSelect.appendChild(o);
     }
+  });
+  timeColumns.forEach(name => {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    xAxisSelect.appendChild(o);
   });
   Object.keys(groups).forEach(key => {
     const g = groups[key];
@@ -455,6 +510,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   );
   initDropdown(orderSelect);
   initDropdown(document.getElementById('aggregate'));
+  document.getElementById('limit').addEventListener('input', e => {
+    e.target.dataset.setByUser = '1';
+  });
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
@@ -498,7 +556,7 @@ function updateSelectedColumns() {
     if (graphTypeSel.value === 'table' && isStringColumn(name)) return false;
     return true;
   });
-  if (graphTypeSel.value === 'table') {
+  if (graphTypeSel.value === 'table' || graphTypeSel.value === 'timeseries') {
     selectedColumns = groupBy.chips.slice();
     if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
     base.forEach(c => {
@@ -821,10 +879,15 @@ function collectParams() {
       return {column: colSel.value, op, value};
     })
   };
-  if (graphTypeSel.value === 'table') {
+  if (graphTypeSel.value === 'table' || graphTypeSel.value === 'timeseries') {
     payload.group_by = groupBy.chips || [];
     payload.aggregate = document.getElementById('aggregate').value;
     payload.show_hits = document.getElementById('show_hits').checked;
+  }
+  if (graphTypeSel.value === 'timeseries') {
+    payload.x_axis = document.getElementById('x_axis').value;
+    payload.granularity = document.getElementById('granularity').value;
+    payload.fill = document.getElementById('fill').value;
   }
   return payload;
 }
@@ -839,10 +902,15 @@ function paramsToSearch(params) {
   if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
   if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
   if (params.graph_type) sp.set('graph_type', params.graph_type);
-  if (params.graph_type === 'table') {
+  if (params.graph_type === 'table' || params.graph_type === 'timeseries') {
     if (params.group_by && params.group_by.length) sp.set('group_by', params.group_by.join(','));
     if (params.aggregate) sp.set('aggregate', params.aggregate);
     if (params.show_hits) sp.set('show_hits', '1');
+  }
+  if (params.graph_type === 'timeseries') {
+    if (params.x_axis) sp.set('x_axis', params.x_axis);
+    if (params.granularity) sp.set('granularity', params.granularity);
+    if (params.fill) sp.set('fill', params.fill);
   }
   const qs = sp.toString();
   return qs ? '?' + qs : '';
@@ -861,6 +929,9 @@ function applyParams(params) {
   }
   graphTypeSel.value = params.graph_type || 'samples';
   updateDisplayTypeUI();
+  if (params.x_axis) document.getElementById('x_axis').value = params.x_axis;
+  if (params.granularity) document.getElementById('granularity').value = params.granularity;
+  if (params.fill) document.getElementById('fill').value = params.fill;
   if (params.group_by) {
     groupBy.chips.splice(0, groupBy.chips.length, ...params.group_by);
     groupBy.renderChips();
@@ -909,6 +980,9 @@ function parseSearch() {
   if (sp.has('group_by')) params.group_by = sp.get('group_by').split(',').filter(c => c);
   if (sp.has('aggregate')) params.aggregate = sp.get('aggregate');
   if (sp.has('show_hits')) params.show_hits = sp.get('show_hits') === '1';
+  if (sp.has('x_axis')) params.x_axis = sp.get('x_axis');
+  if (sp.has('granularity')) params.granularity = sp.get('granularity');
+  if (sp.has('fill')) params.fill = sp.get('fill');
   return params;
 }
 
@@ -1028,18 +1102,68 @@ function handleSort(e) {
   renderTable(rows);
 }
 
+function showTimeSeries(data) {
+  const view = document.getElementById('view');
+  if (data.rows.length === 0) {
+    view.innerHTML = '<p id="empty-message">Empty data provided to table</p>';
+    return;
+  }
+  const width = 600;
+  const height = 400;
+  view.innerHTML = '<div id="legend"></div><svg id="chart" width="' + width + '" height="' + height + '"></svg>';
+  const svg = document.getElementById('chart');
+  const legend = document.getElementById('legend');
+  const groups = groupBy.chips || [];
+  const hasHits = document.getElementById('show_hits').checked ? 1 : 0;
+  const series = {};
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  data.rows.forEach(r => {
+    const ts = new Date(r[0]).getTime();
+    const key = groups.map((_, i) => r[1 + i]).join(':') || 'all';
+    const val = Number(r[1 + groups.length + hasHits]);
+    if (!series[key]) series[key] = [];
+    series[key].push({x: ts, y: val});
+    if (ts < minX) minX = ts;
+    if (ts > maxX) maxX = ts;
+    if (val < minY) minY = val;
+    if (val > maxY) maxY = val;
+  });
+  const colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2'];
+  let colorIndex = 0;
+  const xScale = x => ((x - minX) / (maxX - minX)) * (width - 60) + 50;
+  const yScale = y => height - 30 - ((y - minY) / (maxY - minY)) * (height - 60);
+  Object.keys(series).forEach(key => {
+    const pts = series[key];
+    const color = colors[colorIndex++ % colors.length];
+    const path = pts.map((p,i)=> (i===0? 'M':'L') + xScale(p.x) + ' ' + yScale(p.y)).join(' ');
+    const el = document.createElementNS('http://www.w3.org/2000/svg','path');
+    el.setAttribute('d', path);
+    el.setAttribute('fill','none');
+    el.setAttribute('stroke', color);
+    svg.appendChild(el);
+    const item = document.createElement('div');
+    item.textContent = key;
+    item.style.color = color;
+    legend.appendChild(item);
+  });
+}
+
 function showResults(data) {
   window.lastResults = data;
   const view = document.getElementById('view');
-  if (data.rows.length === 0) {
-    view.innerHTML =
-      '<p id="empty-message">Empty data provided to table</p><table id="results"></table>';
+  if (graphTypeSel.value === 'timeseries') {
+    showTimeSeries(data);
   } else {
-    view.innerHTML = '<table id="results"></table>';
+    if (data.rows.length === 0) {
+      view.innerHTML =
+        '<p id="empty-message">Empty data provided to table</p><table id="results"></table>';
+    } else {
+      view.innerHTML = '<table id="results"></table>';
+    }
+    originalRows = data.rows.slice();
+    sortState = {index: null, dir: null};
+    renderTable(originalRows);
   }
-  originalRows = data.rows.slice();
-  sortState = {index: null, dir: null};
-  renderTable(originalRows);
   document.getElementById('query_info').textContent =
     `Your query took about ${lastQueryTime} ms`;
 }
