@@ -439,3 +439,24 @@ def test_derived_column_basic() -> None:
     data = rv.get_json()
     assert rv.status_code == 200
     assert data["rows"][0][1] == 20
+
+
+def test_timeseries_derived_column() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "granularity": "1 hour",
+        "limit": 7,
+        "columns": ["value"],
+        "derived_columns": {"derived_1": "value * 2"},
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    rows = data["rows"]
+    assert all(r[2] == r[1] * 2 for r in rows)
