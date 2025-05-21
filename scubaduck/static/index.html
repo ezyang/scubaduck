@@ -36,7 +36,7 @@
       width: fit-content;
       flex: 0 0 auto;
     }
-    #filters .filter input.f-val {
+    .chip-input input {
       border: none;
       flex: 1;
       min-width: 60px;
@@ -414,7 +414,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   });
   updateSelectedColumns();
   groupBy = document.getElementById('group_by').closest('.field');
-  initChipInput(groupBy);
+  initChipInput(groupBy, typed =>
+    allColumns.filter(c => c.toLowerCase().includes(typed.toLowerCase()))
+  );
   initDropdown(orderSelect);
   initDropdown(document.getElementById('aggregate'));
   initDropdown(graphTypeSel);
@@ -457,7 +459,9 @@ document.addEventListener('click', e => {
 function updateSelectedColumns() {
   const base = allColumns.filter(name => {
     const cb = document.querySelector(`#column_groups input[value="${name}"]`);
-    return cb && cb.checked;
+    if (!cb || !cb.checked) return false;
+    if (graphTypeSel.value === 'table' && isStringColumn(name)) return false;
+    return true;
   });
   if (graphTypeSel.value === 'table') {
     selectedColumns = groupBy.chips.slice();
@@ -485,7 +489,7 @@ function isTimeColumn(name) {
   return t.includes('TIMESTAMP');
 }
 
-function initChipInput(filter) {
+function initChipInput(filter, fetchOptions) {
   const input = filter.querySelector('.f-val');
   const chipsEl = filter.querySelector('.chip-input');
   const dropdown = filter.querySelector('.chip-dropdown');
@@ -494,7 +498,6 @@ function initChipInput(filter) {
   filter.chips = chips;
   filter.renderChips = renderChips;
   filter.addChip = addChip;
-  let options = [];
   let highlight = 0;
 
   chipsEl.addEventListener('click', () => {
@@ -509,7 +512,7 @@ function initChipInput(filter) {
         span.textContent = v;
         const x = document.createElement('span');
         x.className = 'x';
-        x.textContent = 'x';
+        x.textContent = '✖';
         x.addEventListener('click', () => {
           chips.splice(i, 1);
           renderChips();
@@ -621,24 +624,13 @@ function initChipInput(filter) {
   }
 
   function loadOptions() {
-    const colSel = filter.querySelector('.f-col');
-    if (colSel) {
-      const col = colSel.value;
-      if (!isStringColumn(col)) {
-        dropdown.innerHTML = '';
-        return;
-      }
-      fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(input.value)}`)
-        .then(r => r.json())
-        .then(data => {
-          options = data;
-          renderDropdown(options.slice());
-        });
-    } else if (filter === groupBy) {
-      const typed = input.value.toLowerCase();
-      const opts = allColumns.filter(c => c.toLowerCase().includes(typed));
-      renderDropdown(opts);
+    if (!fetchOptions) {
+      dropdown.innerHTML = '';
+      return;
     }
+    Promise.resolve(fetchOptions(input.value, filter)).then(values => {
+      renderDropdown(Array.isArray(values) ? values : []);
+    });
   }
 
   input.addEventListener('focus', loadOptions);
@@ -658,7 +650,7 @@ function addFilter() {
     <div class="filter-row">
       <select class="f-col"></select>
       <select class="f-op"></select>
-      <button type="button" class="remove" onclick="this.closest('.filter').remove()">X</button>
+      <button type="button" class="remove" onclick="this.closest('.filter').remove()">✖</button>
     </div>
     <div class="chip-box">
       <div class="chip-input">
@@ -708,7 +700,14 @@ function addFilter() {
   initDropdown(container.querySelector('.f-op'));
   populateOps();
   document.getElementById('filter_list').appendChild(container);
-  initChipInput(container);
+  initChipInput(container, (typed, el) => {
+    const colSel = el.querySelector('.f-col');
+    if (!colSel) return [];
+    const col = colSel.value;
+    if (!isStringColumn(col)) return [];
+    return fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(typed)}`)
+      .then(r => r.json());
+  });
 }
 
 let lastQueryTime = 0;
@@ -746,11 +745,8 @@ function collectParams() {
     order_by: document.getElementById('order_by').value,
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
-    columns: selectedColumns,
+    columns: selectedColumns.filter(c => c !== 'Hits'),
     graph_type: graphTypeSel.value,
-    group_by: groupBy.chips || [],
-    aggregate: document.getElementById('aggregate').value,
-    show_hits: document.getElementById('show_hits').checked,
     filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
       const chips = f.chips || [];
       const op = f.querySelector('.f-op').value;
@@ -761,6 +757,11 @@ function collectParams() {
       return {column: f.querySelector('.f-col').value, op, value};
     })
   };
+  if (graphTypeSel.value === 'table') {
+    payload.group_by = groupBy.chips || [];
+    payload.aggregate = document.getElementById('aggregate').value;
+    payload.show_hits = document.getElementById('show_hits').checked;
+  }
   return payload;
 }
 
@@ -774,9 +775,11 @@ function paramsToSearch(params) {
   if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
   if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
   if (params.graph_type) sp.set('graph_type', params.graph_type);
-  if (params.group_by && params.group_by.length) sp.set('group_by', params.group_by.join(','));
-  if (params.aggregate) sp.set('aggregate', params.aggregate);
-  if (params.show_hits) sp.set('show_hits', '1');
+  if (params.graph_type === 'table') {
+    if (params.group_by && params.group_by.length) sp.set('group_by', params.group_by.join(','));
+    if (params.aggregate) sp.set('aggregate', params.aggregate);
+    if (params.show_hits) sp.set('show_hits', '1');
+  }
   const qs = sp.toString();
   return qs ? '?' + qs : '';
 }
