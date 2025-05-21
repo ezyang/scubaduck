@@ -618,3 +618,19 @@ def test_table_group_by_query(page: Any, server_url: str) -> None:
     )
     assert "error" not in data
     assert len(data["rows"]) == 3
+
+
+def test_table_avg_no_group_by(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        aggregate="Avg",
+    )
+    assert len(data["rows"]) == 1
+    row = data["rows"][0]
+    assert row[0] == 4
+    from dateutil import parser
+
+    ts = parser.parse(row[1]).replace(tzinfo=None)
+    assert ts == parser.parse("2024-01-01 13:00:00")
+    assert row[2] == 25
