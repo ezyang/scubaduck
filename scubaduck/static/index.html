@@ -138,7 +138,7 @@
   </style>
 </head>
 <body>
-  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
+  <div id="header"><span id="db_name"></span> - <select id="table"></select> <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
   <div id="content">
     <div id="sidebar">
       <div id="tabs">
@@ -420,6 +420,8 @@ sidebarResizer.addEventListener('mousedown', startSidebarDrag);
 let orderDir = 'ASC';
 const orderDirBtn = document.getElementById('order_dir');
 const graphTypeSel = document.getElementById('graph_type');
+const tableSel = document.getElementById('table');
+const dbNameSpan = document.getElementById('db_name');
 function updateOrderDirButton() {
   orderDirBtn.textContent = orderDir + (orderDir === 'ASC' ? ' \u25B2' : ' \u25BC');
 }
@@ -459,7 +461,12 @@ orderDirBtn.addEventListener('click', () => {
 });
 updateOrderDirButton();
 graphTypeSel.addEventListener('change', updateDisplayTypeUI);
-fetch('/api/columns').then(r => r.json()).then(cols => {
+
+function loadColumns() {
+  const table = tableSel.value;
+  return fetch('/api/columns?table=' + encodeURIComponent(table))
+    .then(r => r.json())
+    .then(cols => {
   const orderSelect = document.getElementById('order_by');
   const xAxisSelect = document.getElementById('x_axis');
   const groupsEl = document.getElementById('column_groups');
@@ -571,7 +578,29 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
+  return cols;
 });
+}
+
+fetch('/api/tables')
+  .then(r => r.json())
+  .then(info => {
+    dbNameSpan.textContent = info.db_name;
+    info.tables.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      tableSel.appendChild(o);
+    });
+    const params = parseSearch();
+    if (params.table && info.tables.includes(params.table)) {
+      tableSel.value = params.table;
+    }
+    tableSel.addEventListener('change', () => {
+      loadColumns().then(() => dive());
+    });
+    return loadColumns();
+  });
 
 document.querySelectorAll('#tabs .tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -843,6 +872,7 @@ function dive(push=true) {
 function collectParams() {
   updateSelectedColumns();
   const payload = {
+    table: tableSel.value,
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
@@ -884,6 +914,7 @@ function collectParams() {
 
 function paramsToSearch(params) {
   const sp = new URLSearchParams();
+  if (params.table) sp.set('table', params.table);
   if (params.start) sp.set('start', params.start);
   if (params.end) sp.set('end', params.end);
   if (params.order_by) sp.set('order_by', params.order_by);
@@ -908,6 +939,7 @@ function paramsToSearch(params) {
 }
 
 function applyParams(params) {
+  if (params.table) setSelectValue(tableSel, params.table);
   document.getElementById('start').value = params.start || '';
   document.getElementById('end').value = params.end || '';
   if (params.order_by) {
@@ -965,6 +997,7 @@ function applyParams(params) {
 function parseSearch() {
   const sp = new URLSearchParams(window.location.search);
   const params = {};
+  if (sp.has('table')) params.table = sp.get('table');
   if (sp.has('start')) params.start = sp.get('start');
   if (sp.has('end')) params.end = sp.get('end');
   if (sp.has('order_by')) params.order_by = sp.get('order_by');

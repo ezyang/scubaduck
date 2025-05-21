@@ -149,8 +149,9 @@ def test_string_filter_ops() -> None:
     assert len(rv.get_json()["rows"]) == 4
 
 
-def _make_payload() -> dict[str, object]:
+def _make_payload(table: str = "events") -> dict[str, object]:
     return {
+        "table": table,
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-02 00:00:00",
         "order_by": "timestamp",
@@ -212,6 +213,32 @@ def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     )
     rows = rv.get_json()["rows"]
     assert len(rows) == 1
+
+
+def test_multiple_tables(tmp_path: Path) -> None:
+    csv_file = tmp_path / "sample.csv"
+    csv_file.write_text(Path("scubaduck/sample.csv").read_text())
+    db_file = tmp_path / "multi.duckdb"
+    con = duckdb.connect(db_file)
+    con.execute(f"CREATE TABLE events AS SELECT * FROM read_csv_auto('{csv_file.as_posix()}')")
+    con.execute(f"CREATE TABLE other AS SELECT * FROM read_csv_auto('{csv_file.as_posix()}')")
+    con.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    app = server.create_app(db_file)
+    client = app.test_client()
+
+    rv = client.get("/api/tables")
+    data = rv.get_json()
+    assert set(data["tables"]) == {"events", "other"}
+
+    rv = client.get("/api/columns?table=other")
+    cols = rv.get_json()
+    assert any(c["name"] == "event" for c in cols)
+
+    payload = _make_payload("other")
+    rv = client.post("/api/query", data=json.dumps(payload), content_type="application/json")
+    rows = rv.get_json()["rows"]
+    assert len(rows) == 3
 
 
 def test_group_by_table() -> None:

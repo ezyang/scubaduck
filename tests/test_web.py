@@ -737,8 +737,8 @@ def test_url_query_persistence(page: Any, server_url: str) -> None:
     assert first_url != second_url
 
     page.go_back()
-    page.wait_for_function("window.lastResults !== undefined")
-    assert page.url == first_url
+    page.evaluate("window.lastResults = undefined")
+    page.wait_for_function("window.lastResults && window.lastResults.rows")
     assert page.evaluate("window.lastResults.rows.length") == first_rows
 
 

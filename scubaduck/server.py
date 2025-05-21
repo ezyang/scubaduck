@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 import time
 from pathlib import Path
 import os
-import sqlite3
 import traceback
 
 import duckdb
@@ -26,6 +25,7 @@ class Filter:
 
 @dataclass
 class QueryParams:
+    table: str = "events"
     start: str | None = None
     end: str | None = None
     order_by: str | None = None
@@ -43,26 +43,46 @@ class QueryParams:
     fill: str = "0"
 
 
-def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
+def _load_database(path: Path) -> tuple[duckdb.DuckDBPyConnection, list[str]]:
     ext = path.suffix.lower()
     if ext == ".csv":
         con = duckdb.connect()
         con.execute(
             f"CREATE TABLE events AS SELECT * FROM read_csv_auto('{path.as_posix()}')"
         )
+        tables = ["events"]
     elif ext in {".db", ".sqlite"}:
         con = duckdb.connect()
-        sconn = sqlite3.connect(path)
-        info = sconn.execute("PRAGMA table_info(events)").fetchall()
-        col_defs = ", ".join(f"{r[1]} {r[2]}" for r in info)
-        con.execute(f"CREATE TABLE events ({col_defs})")
-        placeholders = ",".join("?" for _ in info)
-        for row in sconn.execute("SELECT * FROM events"):
-            con.execute(f"INSERT INTO events VALUES ({placeholders})", row)
-        sconn.close()
+        try:
+            con.load_extension("sqlite")  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            con.execute(f"ATTACH '{path.as_posix()}' AS sqlite_db (TYPE SQLITE)")
+            rows = con.execute(
+                "SELECT name FROM sqlite_db.sqlite_master WHERE type='table'"
+            ).fetchall()
+            tables = [r[0] for r in rows]
+            for t in tables:
+                con.execute(f"CREATE VIEW {t} AS SELECT * FROM sqlite_db.{t}")
+        except Exception:
+            import sqlite3
+
+            sconn = sqlite3.connect(path)
+            rows = sconn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            tables = [r[0] for r in rows]
+            for t in tables:
+                info = sconn.execute(f"PRAGMA table_info({t})").fetchall()
+                col_defs = ", ".join(f"{r[1]} {r[2]}" for r in info)
+                con.execute(f"CREATE TABLE {t} ({col_defs})")
+                placeholders = ",".join("?" for _ in info)
+                for row in sconn.execute(f"SELECT * FROM {t}"):
+                    con.execute(f"INSERT INTO {t} VALUES ({placeholders})", row)
+            sconn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
     else:
         con = duckdb.connect(path)
-    return con
+        rows = con.execute("SHOW TABLES").fetchall()
+        tables = [r[0] for r in rows]
+    return con, tables
 
 
 _REL_RE = re.compile(
@@ -203,7 +223,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
-    query = f"SELECT {select_clause} FROM events"
+    query = f"SELECT {select_clause} FROM {params.table}"
     where_parts: list[str] = []
     if params.start:
         where_parts.append(f"timestamp >= '{params.start}'")
@@ -255,12 +275,13 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         if env_db:
             db_file = env_db
     db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
-    con = _load_database(db_path)
-    column_types: Dict[str, str] = {
-        r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
-    }
+    con, tables = _load_database(db_path)
+    column_types_map: Dict[str, Dict[str, str]] = {}
+    for t in tables:
+        rows = con.execute(f"PRAGMA table_info({t})").fetchall()
+        column_types_map[t] = {r[1]: r[2] for r in rows}
 
-    sample_cache: Dict[Tuple[str, str], Tuple[List[str], float]] = {}
+    sample_cache: Dict[Tuple[str, str, str], Tuple[List[str], float]] = {}
     CACHE_TTL = 60.0
     CACHE_LIMIT = 200
 
@@ -275,12 +296,19 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         folder = Path(app.static_folder) / "js"
         return send_from_directory(folder, filename)
 
+    @app.route("/api/tables")
+    def list_tables() -> Any:  # pyright: ignore[reportUnusedFunction]
+        return jsonify({"db_name": db_path.name, "tables": tables})
+
     @app.route("/api/columns")
     def columns() -> Any:  # pyright: ignore[reportUnusedFunction]
-        rows = con.execute("PRAGMA table_info(events)").fetchall()
-        return jsonify([{"name": r[1], "type": r[2]} for r in rows])
+        table = request.args.get("table", tables[0])
+        if table not in column_types_map:
+            return jsonify([])
+        rows = column_types_map[table]
+        return jsonify([{"name": k, "type": v} for k, v in rows.items()])
 
-    def _cache_get(key: Tuple[str, str]) -> List[str] | None:
+    def _cache_get(key: Tuple[str, str, str]) -> List[str] | None:
         item = sample_cache.get(key)
         if item is None:
             return None
@@ -291,7 +319,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         sample_cache[key] = (vals, time.time())
         return vals
 
-    def _cache_set(key: Tuple[str, str], vals: List[str]) -> None:
+    def _cache_set(key: Tuple[str, str, str], vals: List[str]) -> None:
         sample_cache[key] = (vals, time.time())
         if len(sample_cache) > CACHE_LIMIT:
             oldest = min(sample_cache.items(), key=lambda kv: kv[1][1])[0]
@@ -301,17 +329,19 @@ def create_app(db_file: str | Path | None = None) -> Flask:
     def sample_values() -> Any:  # pyright: ignore[reportUnusedFunction]
         column = request.args.get("column")
         substr = request.args.get("q", "")
-        if not column or column not in column_types:
+        table = request.args.get("table", tables[0])
+        column_types = column_types_map.get(table)
+        if column_types is None or not column or column not in column_types:
             return jsonify([])
         ctype = column_types[column].upper()
         if "CHAR" not in ctype and "STRING" not in ctype and "VARCHAR" not in ctype:
             return jsonify([])
-        key = (column, substr)
+        key = (table, column, substr)
         cached = _cache_get(key)
         if cached is not None:
             return jsonify(cached)
         rows = con.execute(
-            f"SELECT DISTINCT {column} FROM events WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
+            f"SELECT DISTINCT {column} FROM {table} WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
             [substr],
         ).fetchall()
         values = [r[0] for r in rows]
@@ -328,6 +358,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             return jsonify({"error": str(exc)}), 400
 
         params = QueryParams(
+            table=payload.get("table", tables[0]),
             start=start,
             end=end,
             order_by=payload.get("order_by"),
@@ -358,6 +389,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 400,
             )
 
+        column_types = column_types_map.get(params.table, {})
         valid_cols = set(column_types.keys())
         valid_cols.update(params.derived_columns.keys())
         if params.graph_type == "timeseries":
