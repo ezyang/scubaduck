@@ -44,6 +44,26 @@ class QueryParams:
     table: str = "events"
 
 
+def _normalize_sqlite_type(sql: str) -> str:
+    """Map arbitrary SQLite column types to DuckDB-compatible types."""
+    t = sql.strip().upper()
+    if "(" in t:
+        t = t.split("(", 1)[0]
+    if "INT" in t:
+        return "INTEGER"
+    if any(key in t for key in ("CHAR", "CLOB", "TEXT")):
+        return "VARCHAR"
+    if "BLOB" in t:
+        return "BLOB"
+    if any(key in t for key in ("DOUBLE", "REAL", "FLOA", "NUMERIC", "DECIMAL")):
+        return "DOUBLE"
+    if "BOOL" in t:
+        return "BOOLEAN"
+    if "DATE" in t or "TIME" in t:
+        return "TIMESTAMP" if "TIME" in t else "DATE"
+    return "VARCHAR"
+
+
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
     if not path.exists():
         raise FileNotFoundError(path)
@@ -77,7 +97,9 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
             ]
             for t in tables:
                 info = sconn.execute(f'PRAGMA table_info("{t}")').fetchall()
-                col_defs = ", ".join(f"{r[1]} {r[2]}" for r in info)
+                col_defs = ", ".join(
+                    f"{r[1]} {_normalize_sqlite_type(cast(str, r[2]))}" for r in info
+                )
                 con.execute(f'CREATE TABLE "{t}" ({col_defs})')
                 placeholders = ",".join("?" for _ in info)
                 for row in sconn.execute(f'SELECT * FROM "{t}"'):

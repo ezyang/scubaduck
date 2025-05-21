@@ -206,6 +206,62 @@ def test_database_types(tmp_path: Path) -> None:
         assert len(rows) == 3
 
 
+def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    sqlite_file = tmp_path / "events.sqlite"
+    import sqlite3
+
+    conn = sqlite3.connect(sqlite_file)
+    conn.execute(
+        "CREATE TABLE events (timestamp TEXT, url LONGVARCHAR, title VARCHAR(10))"
+    )
+    conn.execute(
+        "INSERT INTO events VALUES ('2024-01-01 00:00:00', 'https://a.com', 'Home')"
+    )
+    conn.commit()
+    conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    from typing import Any
+
+    real_connect = duckdb.connect
+
+    def failing_connect(*args: Any, **kwargs: Any) -> Any:
+        real = real_connect(*args, **kwargs)
+
+        class Wrapper:
+            def __init__(self, con: duckdb.DuckDBPyConnection) -> None:
+                self.con = con
+                self._failed = False
+
+            def execute(self, sql: str, *a: Any, **kw: Any):
+                if not self._failed and sql == "LOAD sqlite":
+                    self._failed = True
+                    raise RuntimeError("fail")
+                return self.con.execute(sql, *a, **kw)
+
+            def __getattr__(self, name: str) -> object:
+                return getattr(self.con, name)
+
+        return Wrapper(real)
+
+    monkeypatch.setattr(server.duckdb, "connect", failing_connect)
+
+    app = server.create_app(sqlite_file)
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-01 01:00:00",
+        "order_by": "timestamp",
+        "columns": ["timestamp", "url", "title"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["rows"][0][1] == "https://a.com"
+
+
 def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     csv_file = tmp_path / "custom.csv"
     csv_file.write_text("timestamp,event,value,user\n2024-01-01 00:00:00,login,5,bob\n")
