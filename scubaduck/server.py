@@ -44,6 +44,9 @@ class QueryParams:
 
 
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
+    if not path.exists():
+        raise FileNotFoundError(path)
+
     ext = path.suffix.lower()
     if ext == ".csv":
         con = duckdb.connect()

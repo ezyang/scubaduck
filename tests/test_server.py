@@ -214,6 +214,13 @@ def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert len(rows) == 1
 
 
+def test_envvar_db_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    missing = tmp_path / "missing.sqlite"
+    monkeypatch.setenv("SCUBADUCK_DB", str(missing))
+    with pytest.raises(FileNotFoundError):
+        server.create_app()
+
+
 def test_group_by_table() -> None:
     app = server.app
     client = app.test_client()

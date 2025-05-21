@@ -47,4 +47,5 @@ flask --app scubaduck.server run --debug
 
 By default the server loads `sample.csv`. Set the `SCUBADUCK_DB` environment
 variable to point at a different database file (CSV, SQLite or DuckDB) if you
-want to use another dataset.
+want to use another dataset. If the file does not exist, the server will raise
+a `FileNotFoundError` during startup.
