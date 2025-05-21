@@ -1039,7 +1039,13 @@ function renderTable(rows) {
   rows.forEach(row => {
     const tr = document.createElement('tr');
     tr.addEventListener('click', () => {
-      tr.classList.toggle('selected');
+      const wasSelected = tr.classList.contains('selected');
+      document
+        .querySelectorAll('#results tr.selected')
+        .forEach(el => el.classList.remove('selected'));
+      if (!wasSelected) {
+        tr.classList.add('selected');
+      }
     });
     row.forEach((v, i) => {
       const col = selectedColumns[i];
