@@ -12,6 +12,8 @@ def run_query(
     order_by: str | None = None,
     order_dir: str | None = "ASC",
     limit: int | None = None,
+    group_by: list[str] | None = None,
+    aggregate: str | None = None,
 ) -> dict[str, Any]:
     page.goto(url)
     page.wait_for_selector("#order_by option", state="attached")
@@ -27,6 +29,15 @@ def run_query(
         page.click("#order_dir")
     if limit is not None:
         page.fill("#limit", str(limit))
+    if group_by is not None:
+        page.select_option("#graph_type", "table")
+        page.evaluate(
+            "g => { groupBy.chips = g; groupBy.renderChips(); }",
+            group_by,
+        )
+    if aggregate is not None:
+        page.select_option("#graph_type", "table")
+        page.select_option("#aggregate", aggregate)
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -246,6 +257,23 @@ def test_invalid_time_error_shown(page: Any, server_url: str) -> None:
     assert "error" in data
     msg = page.text_content("#view")
     assert "nonsense" in msg
+
+
+def test_query_error_shown(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        group_by=["user"],
+        aggregate="Avg",
+    )
+    assert "error" in data
+    assert "traceback" in data
+    msg = page.text_content("#view")
+    assert "avg(event)" in msg
+    assert "Traceback" in msg
 
 
 def test_column_toggle_and_selection(page: Any, server_url: str) -> None:

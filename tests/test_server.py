@@ -264,3 +264,23 @@ def test_invalid_time_error() -> None:
     data = rv.get_json()
     assert rv.status_code == 400
     assert "error" in data
+
+
+def test_query_error_returns_sql_and_traceback() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "columns": ["event"],
+        "group_by": ["user"],
+        "aggregate": "avg",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 400
+    assert "sql" in data
+    assert "traceback" in data
+    assert "avg(event)" in data["sql"]

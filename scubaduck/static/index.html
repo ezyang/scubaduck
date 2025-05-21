@@ -642,7 +642,7 @@ function dive(push=true) {
   fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
     .then(async r => {
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Error');
+      if (!r.ok) throw data;
       return data;
     })
     .then(data => {
@@ -650,7 +650,7 @@ function dive(push=true) {
       showResults(data);
     })
     .catch(err => {
-      showError(err.message);
+      showError(err);
     });
 }
 
@@ -882,10 +882,22 @@ function showResults(data) {
     `Your query took about ${lastQueryTime} ms`;
 }
 
-function showError(msg) {
-  window.lastResults = {error: msg};
+function showError(err) {
+  window.lastResults = err;
   const view = document.getElementById('view');
-  view.innerHTML = `<p id="error-message">${msg}</p>`;
+  let msg = '';
+  if (typeof err === 'string') {
+    msg = err;
+  } else if (err) {
+    msg = err.error || 'Error';
+    if (err.sql) {
+      msg += '\nSQL: ' + err.sql;
+    }
+    if (err.traceback) {
+      msg += '\n' + err.traceback;
+    }
+  }
+  view.innerHTML = `<pre id="error-message">${msg}</pre>`;
   document.getElementById('query_info').textContent = '';
 }
 </script>

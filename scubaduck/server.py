@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import time
 from pathlib import Path
 import sqlite3
+import traceback
 
 import duckdb
 from dateutil import parser as dtparser
@@ -253,7 +254,12 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         try:
             rows = con.execute(sql).fetchall()
         except Exception as exc:
-            return jsonify({"sql": sql, "error": str(exc)}), 400
+            tb = traceback.format_exc()
+            print(f"Query failed:\n{sql}\n{tb}")
+            return (
+                jsonify({"sql": sql, "error": str(exc), "traceback": tb}),
+                400,
+            )
         return jsonify({"sql": sql, "rows": rows})
 
     return app
