@@ -1274,8 +1274,10 @@ function showTimeSeries(data) {
   });
   const colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2'];
   let colorIndex = 0;
-  const xScale = x => ((x - minX) / (maxX - minX)) * (width - 60) + 50;
-  const yScale = y => height - 30 - ((y - minY) / (maxY - minY)) * (height - 60);
+  const xRange = maxX - minX || 1;
+  const yRange = maxY - minY || 1;
+  const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
+  const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
   Object.keys(series).forEach(key => {
     const pts = series[key];
     const color = colors[colorIndex++ % colors.length];

@@ -149,7 +149,10 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         group_cols = ["bucket"] + group_cols
     has_agg = bool(group_cols) or params.aggregate is not None
     if has_agg:
-        select_parts.extend(group_cols)
+        select_cols = (
+            group_cols[1:] if params.graph_type == "timeseries" else group_cols
+        )
+        select_parts.extend(select_cols)
         agg = (params.aggregate or "avg").lower()
 
         def agg_expr(col: str) -> str:
