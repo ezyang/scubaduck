@@ -36,3 +36,15 @@ LIMIT number
 ```
 
 You should write tests for the server backend, demonstrating that at specific query values we get back the correct rows of data.
+
+## Running the server
+
+Activate the virtual environment and run the Flask development server:
+
+```bash
+flask --app scubaduck.server run --debug
+```
+
+By default the server loads `sample.csv`. Set the `SCUBADUCK_DB` environment
+variable to point at a different database file (CSV, SQLite or DuckDB) if you
+want to use another dataset.

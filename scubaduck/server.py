@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import time
 from pathlib import Path
+import os
 import sqlite3
 import traceback
 
@@ -249,6 +250,10 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
 
 def create_app(db_file: str | Path | None = None) -> Flask:
     app = Flask(__name__, static_folder="static")
+    if db_file is None:
+        env_db = os.environ.get("SCUBADUCK_DB")
+        if env_db:
+            db_file = env_db
     db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
     con = _load_database(db_path)
     column_types: Dict[str, str] = {
