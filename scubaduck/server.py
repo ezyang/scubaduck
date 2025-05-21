@@ -342,7 +342,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         if params.order_by and params.order_by not in valid_cols:
             return jsonify({"error": f"Unknown column: {params.order_by}"}), 400
 
-        if params.group_by:
+        if params.group_by or params.graph_type == "timeseries":
             agg = (params.aggregate or "avg").lower()
             if agg.startswith("p") or agg == "sum":
                 need_numeric = True

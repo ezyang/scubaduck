@@ -404,6 +404,13 @@ function updateDisplayTypeUI() {
     if (!lim.dataset.setByUser) {
       lim.value = '7';
     }
+    document.querySelectorAll('#column_groups input').forEach(cb => {
+      if (isTimeColumn(cb.value) || isStringColumn(cb.value)) {
+        cb.checked = false;
+      }
+    });
+    document.getElementById('order_by').value = '';
+    updateSelectedColumns();
   }
   displayType = graphTypeSel.value;
 }
