@@ -546,8 +546,12 @@ function initChipInput(filter, fetchOptions) {
         x.className = 'x';
         x.textContent = '✖';
         x.addEventListener('click', () => {
+          const wasFocused = document.activeElement === input;
           chips.splice(i, 1);
           renderChips();
+          if (wasFocused) {
+            input.focus();
+          }
         });
         span.appendChild(x);
         chipsEl.insertBefore(span, input);
@@ -559,7 +563,9 @@ function initChipInput(filter, fetchOptions) {
   }
 
   function showDropdown() {
-    dropdown.style.display = 'block';
+    if (document.activeElement === input) {
+      dropdown.style.display = 'block';
+    }
   }
 
   function updateHighlight() {
@@ -621,6 +627,7 @@ function initChipInput(filter, fetchOptions) {
         addChip(input.value.trim());
       }
       hideDropdown();
+      input.blur();
       e.preventDefault();
     }
   });
