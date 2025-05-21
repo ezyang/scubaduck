@@ -877,3 +877,14 @@ def test_derived_column_query(page: Any, server_url: str) -> None:
     page.wait_for_function("window.lastResults !== undefined")
     data = page.evaluate("window.lastResults")
     assert data["rows"][0][-1] == 20
+
+
+def test_derived_column_remove(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.click("text=Add Derived")
+    assert page.query_selector("#derived_list .derived button.remove")
+    page.click("#derived_list .derived button.remove")
+    count = page.evaluate("document.querySelectorAll('#derived_list .derived').length")
+    assert count == 0

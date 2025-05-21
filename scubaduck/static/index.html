@@ -44,6 +44,14 @@
       margin-left: 5px;
       flex: 1;
     }
+    #derived_columns .derived-row button.remove {
+      margin-left: 5px;
+      width: 20px;
+      flex: 0 0 auto;
+      padding: 0;
+      text-align: center;
+      line-height: 1;
+    }
     #derived_columns textarea {
       width: 100%;
       box-sizing: border-box;
@@ -743,6 +751,7 @@ function addDerived(data = {}) {
         <option value="numeric">Numeric</option>
       </select>
       <input class="d-name" type="text">
+      <button type="button" class="remove" onclick="removeDerived(this)">✖</button>
     </div>
     <label><input type="checkbox" class="d-use" checked> Include in Query</label>
     <textarea class="d-expr" rows="2"></textarea>
@@ -763,6 +772,16 @@ function addDerived(data = {}) {
     container.addEventListener(evt, refreshDerivedColumns);
   });
   derivedColumns.push(obj);
+  refreshDerivedColumns();
+}
+
+function removeDerived(btn) {
+  const el = btn.closest('.derived');
+  const idx = derivedColumns.findIndex(d => d.el === el);
+  if (idx !== -1) {
+    derivedColumns.splice(idx, 1);
+  }
+  el.remove();
   refreshDerivedColumns();
 }
 
