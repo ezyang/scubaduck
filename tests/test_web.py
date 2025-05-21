@@ -577,6 +577,15 @@ def test_group_by_copy_icon(page: Any, server_url: str) -> None:
     assert icon == "⎘"
 
 
+def test_group_by_input_no_border(page: Any, server_url: str) -> None:
+    page.goto(f"{server_url}?graph_type=table")
+    page.wait_for_selector("#group_by_field", state="visible")
+    border = page.evaluate(
+        "getComputedStyle(document.querySelector('#group_by_field .f-val')).borderStyle"
+    )
+    assert border == "none"
+
+
 def test_table_group_by_query(page: Any, server_url: str) -> None:
     data = run_query(
         page,

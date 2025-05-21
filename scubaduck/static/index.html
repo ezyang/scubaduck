@@ -36,7 +36,7 @@
       width: fit-content;
       flex: 0 0 auto;
     }
-    #filters .filter input.f-val {
+    .chip-input input {
       border: none;
       flex: 1;
       min-width: 60px;
@@ -338,7 +338,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   });
   updateSelectedColumns();
   groupBy = document.getElementById('group_by').closest('.field');
-  initChipInput(groupBy);
+  initChipInput(groupBy, typed =>
+    allColumns.filter(c => c.toLowerCase().includes(typed.toLowerCase()))
+  );
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
@@ -408,7 +410,7 @@ function isTimeColumn(name) {
   return t.includes('TIMESTAMP');
 }
 
-function initChipInput(filter) {
+function initChipInput(filter, fetchOptions) {
   const input = filter.querySelector('.f-val');
   const chipsEl = filter.querySelector('.chip-input');
   const dropdown = filter.querySelector('.chip-dropdown');
@@ -417,7 +419,6 @@ function initChipInput(filter) {
   filter.chips = chips;
   filter.renderChips = renderChips;
   filter.addChip = addChip;
-  let options = [];
   let highlight = 0;
 
   chipsEl.addEventListener('click', () => {
@@ -544,24 +545,13 @@ function initChipInput(filter) {
   }
 
   function loadOptions() {
-    const colSel = filter.querySelector('.f-col');
-    if (colSel) {
-      const col = colSel.value;
-      if (!isStringColumn(col)) {
-        dropdown.innerHTML = '';
-        return;
-      }
-      fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(input.value)}`)
-        .then(r => r.json())
-        .then(data => {
-          options = data;
-          renderDropdown(options.slice());
-        });
-    } else if (filter === groupBy) {
-      const typed = input.value.toLowerCase();
-      const opts = allColumns.filter(c => c.toLowerCase().includes(typed));
-      renderDropdown(opts);
+    if (!fetchOptions) {
+      dropdown.innerHTML = '';
+      return;
     }
+    Promise.resolve(fetchOptions(input.value, filter)).then(values => {
+      renderDropdown(Array.isArray(values) ? values : []);
+    });
   }
 
   input.addEventListener('focus', loadOptions);
@@ -629,7 +619,14 @@ function addFilter() {
   container.querySelector('.f-op').addEventListener('change', updateInputVis);
   populateOps();
   document.getElementById('filter_list').appendChild(container);
-  initChipInput(container);
+  initChipInput(container, (typed, el) => {
+    const colSel = el.querySelector('.f-col');
+    if (!colSel) return [];
+    const col = colSel.value;
+    if (!isStringColumn(col)) return [];
+    return fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(typed)}`)
+      .then(r => r.json());
+  });
 }
 
 let lastQueryTime = 0;
