@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 from scubaduck import server
 import pytest
+from pytest import approx  # pyright: ignore[reportUnknownVariableType]
 
 
 def test_basic_query() -> None:
@@ -407,3 +408,37 @@ def test_derived_column_basic() -> None:
     data = rv.get_json()
     assert rv.status_code == 200
     assert data["rows"][0][1] == 20
+
+
+def test_generated_dataset_table_view() -> None:
+    app = server.app
+    client = app.test_client()
+    base_payload = {
+        "db": "generated",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-08 00:00:00",
+        "graph_type": "table",
+        "order_by": None,
+        "limit": 100,
+        "columns": ["value"],
+        "aggregate": "Avg",
+    }
+
+    rv = client.post(
+        "/api/query", data=json.dumps(base_payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert approx(data["rows"][0][0], rel=1e-6) == 50.7935
+
+    base_payload["group_by"] = ["event"]
+    base_payload["order_by"] = "event"
+    rv = client.post(
+        "/api/query", data=json.dumps(base_payload), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    results = {r[0]: r[1] for r in rows}
+    assert approx(results["login"], rel=1e-6) == 50.77474
+    assert approx(results["logout"], rel=1e-6) == 50.89619
+    assert approx(results["purchase"], rel=1e-6) == 49.90858
+    assert approx(results["view"], rel=1e-6) == 51.11129

@@ -146,8 +146,9 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
     page.wait_for_selector("#order_by option", state="attached")
 
     header = page.text_content("#header")
-    assert "sample.csv" in header
     assert "events" in header
+    ds = page.text_content("#dataset_box")
+    assert "sample" in ds
 
     assert page.is_visible("#settings")
     assert page.is_hidden("#columns")

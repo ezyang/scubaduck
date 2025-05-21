@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Mapping, cast
 
 import re
 from datetime import datetime, timedelta, timezone
@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 import sqlite3
 import traceback
+import random
 
 import duckdb
 from dateutil import parser as dtparser
@@ -61,6 +62,39 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
         sconn.close()
     else:
         con = duckdb.connect(path)
+    return con
+
+
+def _generate_dataset() -> duckdb.DuckDBPyConnection:
+    """Generate a deterministic in-memory dataset."""
+    rng = random.Random(123)
+    start = datetime(2024, 1, 1)
+    con = duckdb.connect()
+    con.execute(
+        """
+        CREATE TABLE events (
+            timestamp TIMESTAMP,
+            event TEXT,
+            value INTEGER,
+            user TEXT,
+            score INTEGER
+        )
+        """
+    )
+    events = ["login", "logout", "purchase", "view"]
+    event_w = [5, 3, 1, 2]
+    users = ["alice", "bob", "charlie", "dave", "eve"]
+    user_w = [5, 2, 2, 1, 1]
+    for _ in range(10_000):
+        ts = start + timedelta(seconds=rng.randrange(7 * 24 * 3600))
+        event = rng.choices(events, weights=event_w)[0]
+        user = rng.choices(users, weights=user_w)[0]
+        value = rng.randint(1, 100)
+        score = rng.randint(0, 10)
+        con.execute(
+            "INSERT INTO events VALUES (?, ?, ?, ?, ?)",
+            (ts, event, value, user, score),
+        )
     return con
 
 
@@ -226,13 +260,39 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
 
 def create_app(db_file: str | Path | None = None) -> Flask:
     app = Flask(__name__, static_folder="static")
-    db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
-    con = _load_database(db_path)
-    column_types: Dict[str, str] = {
-        r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
-    }
 
-    sample_cache: Dict[Tuple[str, str], Tuple[List[str], float]] = {}
+    datasets: Dict[str, tuple[duckdb.DuckDBPyConnection, Dict[str, str]]] | None = None
+    default_db = "default"
+    con: duckdb.DuckDBPyConnection | None = None
+    column_types: Dict[str, str] | None = None
+    if db_file is None:
+        datasets = {}
+
+        def _ensure(name: str) -> tuple[duckdb.DuckDBPyConnection, Dict[str, str]]:
+            if name not in datasets:
+                if name == "sample":
+                    path = Path(__file__).with_name("sample.csv")
+                    con = _load_database(path)
+                elif name == "generated":
+                    con = _generate_dataset()
+                else:  # pragma: no cover - defensive
+                    raise KeyError(name)
+                col_types = {
+                    r[1]: r[2]
+                    for r in con.execute("PRAGMA table_info(events)").fetchall()
+                }
+                datasets[name] = (con, col_types)
+            return datasets[name]
+
+        default_db = "sample"
+        con, column_types = _ensure(default_db)
+    else:
+        con = _load_database(Path(db_file).resolve())
+        column_types = {
+            r[1]: r[2] for r in con.execute("PRAGMA table_info(events)").fetchall()
+        }
+
+    sample_cache: Dict[Tuple[str, str, str], Tuple[List[str], float]] = {}
     CACHE_TTL = 60.0
     CACHE_LIMIT = 200
 
@@ -241,12 +301,32 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         assert app.static_folder is not None
         return send_from_directory(app.static_folder, "index.html")
 
+    def _get_dataset(
+        name: str | None,
+    ) -> tuple[duckdb.DuckDBPyConnection, Dict[str, str]]:
+        if datasets is None:
+            assert con is not None and column_types is not None
+            return con, column_types
+        return _ensure(name or default_db)
+
+    @app.route("/api/datasets")
+    def list_datasets() -> Any:  # pyright: ignore[reportUnusedFunction]
+        if datasets is None:
+            return jsonify([])
+        names = list(datasets.keys())
+        if default_db in names:
+            names.remove(default_db)
+            names.insert(0, default_db)
+        return jsonify(names)
+
     @app.route("/api/columns")
     def columns() -> Any:  # pyright: ignore[reportUnusedFunction]
-        rows = con.execute("PRAGMA table_info(events)").fetchall()
+        db = request.args.get("db")
+        conn, _ = _get_dataset(db)
+        rows = conn.execute("PRAGMA table_info(events)").fetchall()
         return jsonify([{"name": r[1], "type": r[2]} for r in rows])
 
-    def _cache_get(key: Tuple[str, str]) -> List[str] | None:
+    def _cache_get(key: Tuple[str, str, str]) -> List[str] | None:
         item = sample_cache.get(key)
         if item is None:
             return None
@@ -257,7 +337,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         sample_cache[key] = (vals, time.time())
         return vals
 
-    def _cache_set(key: Tuple[str, str], vals: List[str]) -> None:
+    def _cache_set(key: Tuple[str, str, str], vals: List[str]) -> None:
         sample_cache[key] = (vals, time.time())
         if len(sample_cache) > CACHE_LIMIT:
             oldest = min(sample_cache.items(), key=lambda kv: kv[1][1])[0]
@@ -265,18 +345,20 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
     @app.route("/api/samples")
     def sample_values() -> Any:  # pyright: ignore[reportUnusedFunction]
+        db = request.args.get("db")
+        conn, types = _get_dataset(db)
         column = request.args.get("column")
         substr = request.args.get("q", "")
-        if not column or column not in column_types:
+        if not column or column not in types:
             return jsonify([])
-        ctype = column_types[column].upper()
+        ctype = types[column].upper()
         if "CHAR" not in ctype and "STRING" not in ctype and "VARCHAR" not in ctype:
             return jsonify([])
-        key = (column, substr)
+        key = (db or default_db, column, substr)
         cached = _cache_get(key)
         if cached is not None:
             return jsonify(cached)
-        rows = con.execute(
+        rows = conn.execute(
             f"SELECT DISTINCT {column} FROM events WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
             [substr],
         ).fetchall()
@@ -286,31 +368,42 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
     @app.route("/api/query", methods=["POST"])
     def query() -> Any:  # pyright: ignore[reportUnusedFunction]
-        payload = request.get_json(force=True)
+        payload = cast(Dict[str, Any], request.get_json(force=True))
+        db_name = payload.get("db")
         try:
             start = parse_time(payload.get("start"))
             end = parse_time(payload.get("end"))
         except Exception as exc:
             return jsonify({"error": str(exc)}), 400
 
+        conn, col_types = _get_dataset(db_name)
+
         params = QueryParams(
             start=start,
             end=end,
-            order_by=payload.get("order_by"),
-            order_dir=payload.get("order_dir", "ASC"),
-            limit=payload.get("limit"),
-            columns=payload.get("columns", []),
-            derived_columns=payload.get("derived_columns", {}),
-            graph_type=payload.get("graph_type", "samples"),
-            group_by=payload.get("group_by", []),
-            aggregate=payload.get("aggregate"),
-            show_hits=payload.get("show_hits", False),
-            x_axis=payload.get("x_axis"),
-            granularity=payload.get("granularity", "Auto"),
-            fill=payload.get("fill", "0"),
+            order_by=cast(str | None, payload.get("order_by")),
+            order_dir=cast(str, payload.get("order_dir", "ASC")),
+            limit=cast(int | None, payload.get("limit")),
+            columns=cast(list[str], payload.get("columns", [])),
+            derived_columns=cast(dict[str, str], payload.get("derived_columns", {})),
+            graph_type=cast(str, payload.get("graph_type", "samples")),
+            group_by=cast(list[str], payload.get("group_by", [])),
+            aggregate=cast(str | None, payload.get("aggregate")),
+            show_hits=cast(bool, payload.get("show_hits", False)),
+            x_axis=cast(str | None, payload.get("x_axis")),
+            granularity=cast(str, payload.get("granularity", "Auto")),
+            fill=cast(str, payload.get("fill", "0")),
         )
         for f in payload.get("filters", []):
-            params.filters.append(Filter(f["column"], f["op"], f.get("value")))
+            if isinstance(f, Mapping):
+                f_map = cast(Mapping[str, Any], f)
+                params.filters.append(
+                    Filter(
+                        cast(str, f_map["column"]),
+                        cast(str, f_map["op"]),
+                        cast(str | int | float | list[str] | None, f_map.get("value")),
+                    )
+                )
 
         if params.graph_type not in {"table", "timeseries"} and (
             params.group_by or params.aggregate or params.show_hits
@@ -324,7 +417,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 400,
             )
 
-        valid_cols = set(column_types.keys())
+        valid_cols = set(col_types.keys())
         valid_cols.update(params.derived_columns.keys())
         if params.graph_type == "timeseries":
             if params.x_axis is None:
@@ -334,7 +427,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                         break
             if params.x_axis is None or params.x_axis not in valid_cols:
                 return jsonify({"error": "Invalid x_axis"}), 400
-            ctype = column_types.get(params.x_axis, "").upper()
+            ctype = col_types.get(params.x_axis, "").upper()
             if not any(t in ctype for t in ["TIMESTAMP", "DATE", "TIME"]):
                 return jsonify({"error": "x_axis must be a time column"}), 400
         for col in params.columns:
@@ -361,9 +454,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 for c in params.columns:
                     if c in params.group_by or c == params.x_axis:
                         continue
-                    if c not in column_types:
+                    if c not in col_types:
                         continue
-                    ctype = column_types.get(c, "").upper()
+                    ctype = col_types.get(c, "").upper()
                     is_numeric = any(
                         t in ctype
                         for t in [
@@ -395,9 +488,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                             ),
                             400,
                         )
-        sql = build_query(params, column_types)
+        sql = build_query(params, col_types)
         try:
-            rows = con.execute(sql).fetchall()
+            rows = conn.execute(sql).fetchall()
         except Exception as exc:
             tb = traceback.format_exc()
             print(f"Query failed:\n{sql}\n{tb}")

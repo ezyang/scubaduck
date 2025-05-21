@@ -130,7 +130,7 @@
   </style>
 </head>
 <body>
-  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
+  <div id="header"><span id="dataset_box">sample.csv</span> - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
   <div id="content">
     <div id="sidebar">
       <div id="tabs">
@@ -294,6 +294,7 @@ const derivedColumns = [];
 let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
+let datasetSel = null;
 
 function initDropdown(select) {
   const wrapper = document.createElement('div');
@@ -449,7 +450,41 @@ orderDirBtn.addEventListener('click', () => {
 });
 updateOrderDirButton();
 graphTypeSel.addEventListener('change', updateDisplayTypeUI);
-fetch('/api/columns').then(r => r.json()).then(cols => {
+
+fetch('/api/datasets').then(r => r.json()).then(dbs => {
+  const box = document.getElementById('dataset_box');
+  let current = dbs[0] || '';
+  if (dbs.length > 1) {
+    const sel = document.createElement('select');
+    dbs.forEach(n => {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = n;
+      sel.appendChild(o);
+    });
+    box.textContent = '';
+    box.appendChild(sel);
+    datasetSel = sel;
+  } else {
+    box.textContent = current;
+  }
+  const params = parseSearch();
+  if (datasetSel) {
+    datasetSel.value = params.db || current;
+    datasetSel.addEventListener('change', () => {
+      const p = parseSearch();
+      p.db = datasetSel.value;
+      window.location.search = paramsToSearch(p);
+    });
+    params.db = datasetSel.value;
+  } else {
+    params.db = current;
+  }
+  loadColumns(params.db);
+});
+
+function loadColumns(db) {
+  fetch('/api/columns' + (db ? '?db=' + encodeURIComponent(db) : '')).then(r => r.json()).then(cols => {
   const orderSelect = document.getElementById('order_by');
   const xAxisSelect = document.getElementById('x_axis');
   const groupsEl = document.getElementById('column_groups');
@@ -561,7 +596,8 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
-});
+  });
+}
 
 document.querySelectorAll('#tabs .tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1022,6 +1058,7 @@ function collectParams() {
     payload.granularity = document.getElementById('granularity').value;
     payload.fill = document.getElementById('fill').value;
   }
+  if (datasetSel) payload.db = datasetSel.value;
   return payload;
 }
 
@@ -1046,6 +1083,7 @@ function paramsToSearch(params) {
     if (params.granularity) sp.set('granularity', params.granularity);
     if (params.fill) sp.set('fill', params.fill);
   }
+  if (params.db) sp.set('db', params.db);
   const qs = sp.toString();
   return qs ? '?' + qs : '';
 }
@@ -1066,6 +1104,7 @@ function applyParams(params) {
   if (params.x_axis) document.getElementById('x_axis').value = params.x_axis;
   if (params.granularity) document.getElementById('granularity').value = params.granularity;
   if (params.fill) document.getElementById('fill').value = params.fill;
+  if (datasetSel && params.db) datasetSel.value = params.db;
   if (params.group_by) {
     groupBy.chips.splice(0, groupBy.chips.length, ...params.group_by);
     groupBy.renderChips();
@@ -1127,6 +1166,7 @@ function parseSearch() {
   if (sp.has('derived_columns')) {
     try { params.derived_columns = JSON.parse(sp.get('derived_columns')); } catch(e) { params.derived_columns = []; }
   }
+  if (sp.has('db')) params.db = sp.get('db');
   return params;
 }
 
