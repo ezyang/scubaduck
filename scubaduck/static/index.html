@@ -234,6 +234,9 @@ let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
 function initDropdown(select) {
   const wrapper = document.createElement('div');
   wrapper.className = 'dropdown';
+  if (select.classList.contains('f-col')) {
+    wrapper.classList.add('f-col');
+  }
   select.parentNode.insertBefore(wrapper, select);
   wrapper.appendChild(select);
   select.style.display = 'none';
@@ -732,9 +735,9 @@ function addFilter() {
   populateOps();
   document.getElementById('filter_list').appendChild(container);
   initChipInput(container, (typed, el) => {
-    const colSel = el.querySelector('.f-col');
-    if (!colSel) return [];
-    const col = colSel.value;
+    const colEl = el.querySelector('.f-col select') || el.querySelector('.f-col');
+    if (!colEl) return [];
+    const col = colEl.value;
     if (!isStringColumn(col)) return [];
     return fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(typed)}`)
       .then(r => r.json());
@@ -785,7 +788,8 @@ function collectParams() {
       if (op !== 'empty' && op !== '!empty') {
         value = chips.length === 0 ? null : (chips.length === 1 ? chips[0] : chips);
       }
-      return {column: f.querySelector('.f-col').value, op, value};
+      const colSel = f.querySelector('.f-col select') || f.querySelector('.f-col');
+      return {column: colSel.value, op, value};
     })
   };
   if (graphTypeSel.value === 'table') {
@@ -844,8 +848,9 @@ function applyParams(params) {
     params.filters.forEach(f => {
       addFilter();
       const el = list.lastElementChild;
-      el.querySelector('.f-col').value = f.column;
-      el.querySelector('.f-col').dispatchEvent(new Event('change'));
+      const colSel = el.querySelector('.f-col select') || el.querySelector('.f-col');
+      colSel.value = f.column;
+      colSel.dispatchEvent(new Event('change'));
       el.querySelector('.f-op').value = f.op;
       el.querySelector('.f-op').dispatchEvent(new Event('change'));
       if (f.value !== null && f.op !== 'empty' && f.op !== '!empty') {
@@ -1022,8 +1027,11 @@ function showError(err) {
 function setSelectValue(selector, value) {
   const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
   if (el) {
-    el.value = value;
-    el.dispatchEvent(new Event('change'));
+    const select = el.tagName === 'SELECT' ? el : el.querySelector('select');
+    if (select) {
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+    }
   }
 }
 </script>
