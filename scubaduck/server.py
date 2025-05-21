@@ -271,7 +271,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 400,
             )
 
-        valid_cols = set(column_types.keys())
+        valid_cols = set(column_types.keys()).union(params.derived_columns.keys())
         for col in params.columns:
             if col not in valid_cols:
                 return jsonify({"error": f"Unknown column: {col}"}), 400
@@ -295,6 +295,8 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             if need_numeric or allow_time:
                 for c in params.columns:
                     if c in params.group_by:
+                        continue
+                    if c not in column_types:
                         continue
                     ctype = column_types.get(c, "").upper()
                     is_numeric = any(

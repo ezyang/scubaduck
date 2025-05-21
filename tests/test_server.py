@@ -347,3 +347,24 @@ def test_table_avg_with_timestamp() -> None:
 
     ts = parser.parse(rows[0][1]).replace(tzinfo=None)
     assert ts == parser.parse("2024-01-01 12:00:00")
+
+
+def test_derived_column_query() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-01 01:00:00",
+        "order_by": "timestamp",
+        "limit": 10,
+        "columns": ["timestamp"],
+        "derived_columns": {"double_val": "value * 2"},
+        "filters": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    rows = data["rows"]
+    assert rows[0][1] == 20

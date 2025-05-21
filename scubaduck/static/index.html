@@ -83,6 +83,11 @@
       text-align: center;
       line-height: 1;
     }
+    #derived_columns .derived { border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; display: flex; flex-direction: column; }
+    #derived_columns .derived-row1 { display: flex; align-items: center; margin-bottom: 5px; }
+    #derived_columns .derived-row1 .d-name { flex: 1; margin-left: 5px; }
+    #derived_columns .derived-row1 button.remove { margin-left: 5px; width: 20px; padding: 0; }
+    #derived_columns textarea { width: 100%; box-sizing: border-box; }
     #filters h4 { margin: 0 0 5px 0; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border: 1px solid #ccc; padding: 4px; box-sizing: border-box; }
@@ -214,6 +219,11 @@
           <a id="columns_none" href="#">None</a>
         </div>
         <div id="column_groups"></div>
+        <div id="derived_columns" style="margin-top:10px;">
+          <h4>Derived Columns</h4>
+          <div id="derived_list"></div>
+          <button id="add_derived" type="button">Add Derived Column</button>
+        </div>
       </div>
     </div>
     <div id="sidebar-resizer"></div>
@@ -224,9 +234,12 @@
 <script>
 const allColumns = [];
 const columnTypes = {};
+const baseColumns = [];
+const baseColumnTypes = {};
 const stringColumns = [];
 const integerColumns = [];
 const timeColumns = [];
+const derivedDefs = [];
 let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
@@ -378,7 +391,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   };
   cols.forEach(c => {
     const t = c.type.toUpperCase();
+    baseColumnTypes[c.name] = c.type;
     columnTypes[c.name] = c.type;
+    baseColumns.push(c.name);
     allColumns.push(c.name);
     let g = 'string';
     if (t.includes('INT')) g = 'integer';
@@ -457,6 +472,7 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   initDropdown(document.getElementById('aggregate'));
   updateDisplayTypeUI();
   addFilter();
+  document.getElementById('add_derived').addEventListener('click', () => addDerived());
   initFromUrl();
 });
 
@@ -498,14 +514,23 @@ function updateSelectedColumns() {
     if (graphTypeSel.value === 'table' && isStringColumn(name)) return false;
     return true;
   });
+  const derived = [];
+  document.querySelectorAll('#derived_list .derived').forEach(d => {
+    const name = d.querySelector('.d-name').value.trim();
+    if (!name) return;
+    if (d.querySelector('.d-include').checked) derived.push(name);
+  });
   if (graphTypeSel.value === 'table') {
     selectedColumns = groupBy.chips.slice();
     if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
     base.forEach(c => {
       if (!selectedColumns.includes(c)) selectedColumns.push(c);
     });
+    derived.forEach(c => {
+      if (!selectedColumns.includes(c)) selectedColumns.push(c);
+    });
   } else {
-    selectedColumns = base;
+    selectedColumns = base.concat(derived);
   }
 }
 
@@ -522,6 +547,37 @@ function isIntegerColumn(name) {
 function isTimeColumn(name) {
   const t = (columnTypes[name] || '').toUpperCase();
   return t.includes('TIMESTAMP');
+}
+
+function rebuildColumns() {
+  allColumns.splice(0, allColumns.length, ...baseColumns);
+  Object.keys(columnTypes).forEach(k => {
+    if (!baseColumnTypes[k]) delete columnTypes[k];
+  });
+  Object.keys(baseColumnTypes).forEach(k => {
+    columnTypes[k] = baseColumnTypes[k];
+  });
+  derivedDefs.forEach(def => {
+    allColumns.push(def.name);
+    columnTypes[def.name] = def.type === 'String' ? 'TEXT' : 'INT';
+  });
+  updateOrderByOptions();
+  updateSelectedColumns();
+}
+
+function updateOrderByOptions() {
+  const sel = document.getElementById('order_by');
+  const cur = sel.value;
+  sel.innerHTML = '';
+  allColumns.forEach(name => {
+    if (!isStringColumn(name)) {
+      const o = document.createElement('option');
+      o.value = name;
+      o.textContent = name;
+      sel.appendChild(o);
+    }
+  });
+  if (cur) setSelectValue(sel, cur);
 }
 
 function formatNumber(val) {
@@ -773,6 +829,65 @@ function addFilter() {
   });
 }
 
+function nextDerivedName() {
+  let i = 1;
+  while (allColumns.includes(`derived_${i}`)) i++;
+  return `derived_${i}`;
+}
+
+function addDerived(def) {
+  const container = document.createElement('div');
+  container.className = 'derived';
+  container.innerHTML = `
+    <div class="derived-row1">
+      <select class="d-type">
+        <option>Aggregated</option>
+        <option>String</option>
+        <option>Numeric</option>
+      </select>
+      <input class="d-name" type="text">
+      <button type="button" class="remove" onclick="removeDerived(this)">✖</button>
+    </div>
+    <label><input type="checkbox" class="d-include" checked> Include in Query</label>
+    <textarea class="d-expr" rows="2"></textarea>
+  `;
+  const nameInput = container.querySelector('.d-name');
+  nameInput.value = def && def.name ? def.name : nextDerivedName();
+  container.querySelector('.d-expr').value = def && def.expr ? def.expr : '';
+  const typeSel = container.querySelector('.d-type');
+  if (def && def.type) typeSel.value = def.type;
+  const includeCb = container.querySelector('.d-include');
+  includeCb.checked = !def || def.include !== false;
+  document.getElementById('derived_list').appendChild(container);
+  const idx = derivedDefs.length;
+  derivedDefs.push({name: nameInput.value, type: typeSel.value, expr: container.querySelector('.d-expr').value, include: includeCb.checked});
+  function updateDef() {
+    derivedDefs[idx] = {
+      name: nameInput.value.trim(),
+      type: typeSel.value,
+      expr: container.querySelector('.d-expr').value,
+      include: includeCb.checked,
+    };
+    rebuildColumns();
+  }
+  nameInput.addEventListener('input', updateDef);
+  typeSel.addEventListener('change', updateDef);
+  includeCb.addEventListener('change', updateDef);
+  container.querySelector('.d-expr').addEventListener('input', updateDef);
+  updateDef();
+}
+
+function removeDerived(btn) {
+  const box = btn.closest('.derived');
+  const list = Array.from(document.querySelectorAll('#derived_list .derived'));
+  const idx = list.indexOf(box);
+  if (idx !== -1) {
+    derivedDefs.splice(idx, 1);
+  }
+  box.remove();
+  rebuildColumns();
+}
+
 let lastQueryTime = 0;
 let queryStart = 0;
 
@@ -802,13 +917,19 @@ function dive(push=true) {
 
 function collectParams() {
   updateSelectedColumns();
+  const baseSel = allColumns.filter(name => {
+    const cb = document.querySelector(`#column_groups input[value="${name}"]`);
+    if (!cb || !cb.checked) return false;
+    if (graphTypeSel.value === 'table' && isStringColumn(name)) return false;
+    return true;
+  });
   const payload = {
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
-    columns: selectedColumns.filter(c => c !== 'Hits'),
+    columns: baseSel,
     graph_type: graphTypeSel.value,
     filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
       const chips = f.chips || [];
@@ -826,6 +947,23 @@ function collectParams() {
     payload.aggregate = document.getElementById('aggregate').value;
     payload.show_hits = document.getElementById('show_hits').checked;
   }
+  const defs = [];
+  document.querySelectorAll('#derived_list .derived').forEach(d => {
+    const obj = {
+      name: d.querySelector('.d-name').value.trim(),
+      type: d.querySelector('.d-type').value,
+      include: d.querySelector('.d-include').checked,
+      expr: d.querySelector('.d-expr').value,
+    };
+    if (obj.name && obj.expr) defs.push(obj);
+  });
+  payload.derived_defs = defs;
+  payload.derived_columns = {};
+  defs.forEach(def => {
+    if (def.include || (payload.group_by || []).includes(def.name) || payload.order_by === def.name) {
+      payload.derived_columns[def.name] = def.expr;
+    }
+  });
   return payload;
 }
 
@@ -844,6 +982,7 @@ function paramsToSearch(params) {
     if (params.aggregate) sp.set('aggregate', params.aggregate);
     if (params.show_hits) sp.set('show_hits', '1');
   }
+  if (params.derived_defs && params.derived_defs.length) sp.set('derived', JSON.stringify(params.derived_defs));
   const qs = sp.toString();
   return qs ? '?' + qs : '';
 }
@@ -891,6 +1030,13 @@ function applyParams(params) {
   } else {
     addFilter();
   }
+  const dlist = document.getElementById('derived_list');
+  dlist.innerHTML = '';
+  derivedDefs.splice(0, derivedDefs.length);
+  if (params.derived_defs && params.derived_defs.length) {
+    params.derived_defs.forEach(def => addDerived(def));
+  }
+  rebuildColumns();
 }
 
 function parseSearch() {
@@ -909,6 +1055,9 @@ function parseSearch() {
   if (sp.has('group_by')) params.group_by = sp.get('group_by').split(',').filter(c => c);
   if (sp.has('aggregate')) params.aggregate = sp.get('aggregate');
   if (sp.has('show_hits')) params.show_hits = sp.get('show_hits') === '1';
+  if (sp.has('derived')) {
+    try { params.derived_defs = JSON.parse(sp.get('derived')); } catch(e) { params.derived_defs = []; }
+  }
   return params;
 }
 
@@ -966,8 +1115,8 @@ function renderTable(rows) {
     tr.addEventListener('click', () => {
       tr.classList.toggle('selected');
     });
-    row.forEach((v, i) => {
-      const col = selectedColumns[i];
+    selectedColumns.forEach((col, i) => {
+      const v = row[i];
       const td = document.createElement('td');
       if (isTimeColumn(col)) {
         const d = new Date(v);
