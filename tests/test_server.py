@@ -200,6 +200,20 @@ def test_database_types(tmp_path: Path) -> None:
         assert len(rows) == 3
 
 
+def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    csv_file = tmp_path / "custom.csv"
+    csv_file.write_text("timestamp,event,value,user\n2024-01-01 00:00:00,login,5,bob\n")
+    monkeypatch.setenv("SCUBADUCK_DB", str(csv_file))
+    app = server.create_app()
+    client = app.test_client()
+    payload = _make_payload()
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert len(rows) == 1
+
+
 def test_group_by_table() -> None:
     app = server.app
     client = app.test_client()
