@@ -875,12 +875,22 @@ function renderTable(rows) {
   const header = document.createElement('tr');
   selectedColumns.forEach((col, i) => {
     const th = document.createElement('th');
-    th.textContent = col;
+    let label = col;
+    if (
+      displayType === 'table' &&
+      col !== 'Hits' &&
+      !(groupBy.chips || []).includes(col)
+    ) {
+      const agg = document.getElementById('aggregate').value.toLowerCase();
+      label += ` (${agg})`;
+    }
+    th.textContent = label;
     th.dataset.index = i;
     th.addEventListener('click', handleSort);
     if (sortState.index === i) {
       th.classList.add('sorted');
-      th.textContent = col + (sortState.dir === 'desc' ? ' \u25BC' : ' \u25B2');
+      th.textContent =
+        label + (sortState.dir === 'desc' ? ' \u25BC' : ' \u25B2');
     }
     if (!isStringColumn(col)) th.style.textAlign = 'right';
     header.appendChild(th);

@@ -634,3 +634,15 @@ def test_table_avg_no_group_by(page: Any, server_url: str) -> None:
     ts = parser.parse(row[1]).replace(tzinfo=None)
     assert ts == parser.parse("2024-01-01 13:00:00")
     assert row[2] == 25
+
+
+def test_table_headers_show_aggregate(page: Any, server_url: str) -> None:
+    run_query(
+        page,
+        server_url,
+        aggregate="Avg",
+    )
+    headers = page.locator("#results th").all_inner_texts()
+    assert "Hits" in headers
+    assert "timestamp (avg)" in headers
+    assert "value (avg)" in headers
