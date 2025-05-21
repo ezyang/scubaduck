@@ -433,7 +433,7 @@ function initChipInput(filter, fetchOptions) {
         span.textContent = v;
         const x = document.createElement('span');
         x.className = 'x';
-        x.textContent = 'x';
+        x.textContent = '✖';
         x.addEventListener('click', () => {
           chips.splice(i, 1);
           renderChips();
@@ -571,7 +571,7 @@ function addFilter() {
     <div class="filter-row">
       <select class="f-col"></select>
       <select class="f-op"></select>
-      <button type="button" class="remove" onclick="this.closest('.filter').remove()">X</button>
+      <button type="button" class="remove" onclick="this.closest('.filter').remove()">✖</button>
     </div>
     <div class="chip-box">
       <div class="chip-input">
