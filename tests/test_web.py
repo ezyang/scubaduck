@@ -185,6 +185,17 @@ def test_graph_type_table_fields(page: Any, server_url: str) -> None:
     assert not page.is_visible("text=Strings:")
 
 
+def test_graph_type_timeseries_fields(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    assert page.is_visible("#group_by_field")
+    assert page.is_visible("#aggregate_field")
+    assert page.is_visible("#x_axis_field")
+    assert page.is_visible("#granularity_field")
+    assert page.is_visible("#fill_field")
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

@@ -61,7 +61,6 @@ def test_empty_filter_is_noop() -> None:
     base_payload = {
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
-        "order_by": "timestamp",
         "limit": 100,
         "columns": ["timestamp", "event", "value", "user"],
     }
@@ -347,3 +346,25 @@ def test_table_avg_with_timestamp() -> None:
 
     ts = parser.parse(rows[0][1]).replace(tzinfo=None)
     assert ts == parser.parse("2024-01-01 12:00:00")
+
+
+def test_timeseries_basic() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "limit": 100,
+        "group_by": ["user"],
+        "aggregate": "Count",
+        "columns": ["value"],
+        "x_axis": "timestamp",
+        "granularity": "1 day",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 4
