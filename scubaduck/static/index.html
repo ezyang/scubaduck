@@ -640,10 +640,17 @@ function dive(push=true) {
   window.lastResults = undefined;
   queryStart = performance.now();
   fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
-    .then(r=>r.json())
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Error');
+      return data;
+    })
     .then(data => {
       lastQueryTime = Math.round(performance.now() - queryStart);
       showResults(data);
+    })
+    .catch(err => {
+      showError(err.message);
     });
 }
 
@@ -873,6 +880,13 @@ function showResults(data) {
   renderTable(originalRows);
   document.getElementById('query_info').textContent =
     `Your query took about ${lastQueryTime} ms`;
+}
+
+function showError(msg) {
+  window.lastResults = {error: msg};
+  const view = document.getElementById('view');
+  view.innerHTML = `<p id="error-message">${msg}</p>`;
+  document.getElementById('query_info').textContent = '';
 }
 </script>
 </body>
