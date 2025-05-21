@@ -729,6 +729,25 @@ def test_table_enhancements(page: Any, server_url: str) -> None:
     assert not overflow
 
 
+def test_table_single_selection(page: Any, server_url: str) -> None:
+    run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        limit=10,
+    )
+    page.click("#results tr:nth-child(2)")
+    page.click("#results tr:nth-child(3)")
+    count = page.evaluate("document.querySelectorAll('#results tr.selected').length")
+    assert count == 1
+    is_third = page.evaluate(
+        "document.querySelector('#results tr:nth-child(3)').classList.contains('selected')"
+    )
+    assert is_third
+
+
 def test_timestamp_rendering(page: Any, server_url: str) -> None:
     run_query(
         page,
