@@ -55,6 +55,13 @@
     .rel-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; z-index: 10; display: none; }
     .rel-dropdown div { padding: 2px 4px; cursor: pointer; }
     .rel-dropdown div:hover { background: #bde4ff; }
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-display { border: 1px solid #ccc; padding: 2px 18px 2px 4px; cursor: pointer; min-width: 80px; }
+    .dropdown-menu { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; z-index: 10; max-height: 160px; overflow-y: auto; display: none; }
+    .dropdown-menu input { width: 100%; box-sizing: border-box; padding: 2px 4px; border: none; border-bottom: 1px solid #ccc; }
+    .dropdown-menu div { padding: 2px 4px; cursor: pointer; }
+    .dropdown-menu div.selected { background: #bde4ff; }
+    .dropdown-menu div:hover { background: #eee; }
     #filters .filter button.remove {
       margin-left: 5px;
       width: 20px;
@@ -207,6 +214,75 @@ const timeColumns = [];
 let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
+
+function initDropdown(select) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dropdown';
+  select.parentNode.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+  select.style.display = 'none';
+  const disp = document.createElement('div');
+  disp.className = 'dropdown-display';
+  function updateDisplay() {
+    const opt = select.options[select.selectedIndex];
+    disp.textContent = opt ? opt.textContent : '';
+  }
+  updateDisplay();
+  wrapper.appendChild(disp);
+  const menu = document.createElement('div');
+  menu.className = 'dropdown-menu';
+  const search = document.createElement('input');
+  menu.appendChild(search);
+  const list = document.createElement('div');
+  menu.appendChild(list);
+  wrapper.appendChild(menu);
+
+  function close() {
+    menu.style.display = 'none';
+  }
+
+  function open() {
+    renderOptions();
+    menu.style.display = 'block';
+    search.focus();
+  }
+
+  disp.addEventListener('click', () => {
+    if (menu.style.display === 'block') {
+      close();
+    } else {
+      open();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!wrapper.contains(e.target)) {
+      close();
+    }
+  });
+
+  function renderOptions() {
+    const q = search.value.toLowerCase();
+    list.innerHTML = '';
+    Array.from(select.options).forEach(o => {
+      if (!o.textContent.toLowerCase().includes(q)) return;
+      const div = document.createElement('div');
+      div.textContent = o.textContent;
+      if (o.value === select.value) div.className = 'selected';
+      div.addEventListener('mousedown', evt => {
+        evt.preventDefault();
+        select.value = o.value;
+        select.dispatchEvent(new Event('change'));
+        updateDisplay();
+        close();
+      });
+      list.appendChild(div);
+    });
+  }
+
+  search.addEventListener('input', renderOptions);
+  select.addEventListener('change', updateDisplay);
+}
 // Sidebar resizing
 const sidebar = document.getElementById('sidebar');
 const sidebarResizer = document.getElementById('sidebar-resizer');
@@ -339,6 +415,9 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   updateSelectedColumns();
   groupBy = document.getElementById('group_by').closest('.field');
   initChipInput(groupBy);
+  initDropdown(orderSelect);
+  initDropdown(document.getElementById('aggregate'));
+  initDropdown(graphTypeSel);
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
@@ -591,6 +670,7 @@ function addFilter() {
   `;
   const colSel = container.querySelector('.f-col');
   colSel.innerHTML = allColumns.map(c => `<option value="${c}">${c}</option>`).join('');
+  initDropdown(colSel);
 
   function populateOps() {
     const opSel = container.querySelector('.f-op');
@@ -625,6 +705,7 @@ function addFilter() {
 
   colSel.addEventListener('change', populateOps);
   container.querySelector('.f-op').addEventListener('change', updateInputVis);
+  initDropdown(container.querySelector('.f-op'));
   populateOps();
   document.getElementById('filter_list').appendChild(container);
   initChipInput(container);
@@ -902,6 +983,14 @@ function showError(err) {
   }
   view.innerHTML = `<pre id="error-message">${msg}</pre>`;
   document.getElementById('query_info').textContent = '';
+}
+
+function setSelectValue(selector, value) {
+  const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+  if (el) {
+    el.value = value;
+    el.dispatchEvent(new Event('change'));
+  }
 }
 </script>
 </body>
