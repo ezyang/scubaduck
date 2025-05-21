@@ -110,10 +110,22 @@ function showTimeSeries(data) {
     el.setAttribute('d', path.trim());
     el.setAttribute('fill', 'none');
     el.setAttribute('stroke', color);
+    el.setAttribute('stroke-width', '1');
     svg.appendChild(el);
     const item = document.createElement('div');
     item.textContent = key;
     item.style.color = color;
+    item.className = 'legend-item';
     legend.appendChild(item);
+
+    function highlight(on) {
+      el.setAttribute('stroke-width', on ? '3' : '1');
+      item.classList.toggle('highlight', on);
+    }
+
+    el.addEventListener('mouseenter', () => highlight(true));
+    el.addEventListener('mouseleave', () => highlight(false));
+    item.addEventListener('mouseenter', () => highlight(true));
+    item.addEventListener('mouseleave', () => highlight(false));
   });
 }
