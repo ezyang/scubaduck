@@ -3,11 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
+import re
+from datetime import datetime, timedelta, timezone
+
 import time
 from pathlib import Path
 import sqlite3
 
 import duckdb
+from dateutil import parser as dtparser
 from flask import Flask, jsonify, request, send_from_directory
 
 
@@ -54,6 +58,43 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
     else:
         con = duckdb.connect(path)
     return con
+
+
+_REL_RE = re.compile(
+    r"([+-]?\d+(?:\.\d*)?)\s*(hour|hours|day|days|week|weeks|fortnight|fortnights)",
+    re.IGNORECASE,
+)
+
+
+def parse_time(val: str | None) -> str | None:
+    """Parse an absolute or relative time string into ``YYYY-MM-DD HH:MM:SS``."""
+    if val is None or val == "":
+        return None
+    s = val.strip()
+    if s.lower() == "now":
+        dt = datetime.now(timezone.utc)
+        return dt.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+    m = _REL_RE.fullmatch(s)
+    if m:
+        qty = float(m.group(1))
+        unit = m.group(2).lower()
+        delta: timedelta
+        if unit.startswith("hour"):
+            delta = timedelta(hours=qty)
+        elif unit.startswith("day"):
+            delta = timedelta(days=qty)
+        elif unit.startswith("week"):
+            delta = timedelta(weeks=qty)
+        elif unit.startswith("fortnight"):
+            delta = timedelta(weeks=2 * qty)
+        else:  # pragma: no cover - defensive
+            raise ValueError(f"Unsupported unit: {unit}")
+        dt = datetime.now(timezone.utc) + delta
+        return dt.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+    dt = dtparser.parse(s)
+    return dt.replace(microsecond=0, tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def build_query(params: QueryParams) -> str:
@@ -187,9 +228,15 @@ def create_app(db_file: str | Path | None = None) -> Flask:
     @app.route("/api/query", methods=["POST"])
     def query() -> Any:  # pyright: ignore[reportUnusedFunction]
         payload = request.get_json(force=True)
+        try:
+            start = parse_time(payload.get("start"))
+            end = parse_time(payload.get("end"))
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
         params = QueryParams(
-            start=payload.get("start"),
-            end=payload.get("end"),
+            start=start,
+            end=end,
             order_by=payload.get("order_by"),
             order_dir=payload.get("order_dir", "ASC"),
             limit=payload.get("limit"),
@@ -203,7 +250,10 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
         sql = build_query(params)
-        rows = con.execute(sql).fetchall()
+        try:
+            rows = con.execute(sql).fetchall()
+        except Exception as exc:
+            return jsonify({"sql": sql, "error": str(exc)}), 400
         return jsonify({"sql": sql, "rows": rows})
 
     return app

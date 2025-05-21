@@ -5,6 +5,7 @@ from pathlib import Path
 
 import duckdb
 from scubaduck import server
+import pytest
 
 
 def test_basic_query() -> None:
@@ -212,3 +213,54 @@ def test_group_by_table() -> None:
     assert rows[0][0] == "alice"
     assert rows[0][1] == 2
     assert rows[0][2] == 40
+
+
+def test_relative_time_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = server.app
+    client = app.test_client()
+
+    from datetime import datetime
+
+    fixed_now = datetime(2024, 1, 2, 4, 0, 0)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(server, "datetime", FixedDateTime)
+
+    payload = {
+        "start": "-1 hour",
+        "end": "now",
+        "order_by": "timestamp",
+        "limit": 100,
+        "columns": ["timestamp", "event", "value", "user"],
+        "filters": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 1
+    assert data["rows"][0][3] == "charlie"
+
+
+def test_invalid_time_error() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "nonsense",
+        "end": "now",
+        "order_by": "timestamp",
+        "limit": 10,
+        "columns": ["timestamp"],
+        "filters": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 400
+    assert "error" in data

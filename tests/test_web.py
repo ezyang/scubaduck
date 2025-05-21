@@ -235,6 +235,19 @@ def test_end_dropdown_now(page: Any, server_url: str) -> None:
     assert page.input_value("#end") == "now"
 
 
+def test_invalid_time_error_shown(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="nonsense",
+        end="now",
+        order_by="timestamp",
+    )
+    assert "error" in data
+    msg = page.text_content("#view")
+    assert "nonsense" in msg
+
+
 def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
