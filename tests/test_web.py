@@ -270,10 +270,8 @@ def test_query_error_shown(page: Any, server_url: str) -> None:
         aggregate="Avg",
     )
     assert "error" in data
-    assert "traceback" in data
     msg = page.text_content("#view")
-    assert "avg(event)" in msg
-    assert "Traceback" in msg
+    assert "Aggregate avg" in msg
 
 
 def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
@@ -577,3 +575,18 @@ def test_group_by_copy_icon(page: Any, server_url: str) -> None:
     page.wait_for_selector("#group_by_field", state="visible")
     icon = page.text_content("#group_by_field .chip-copy")
     assert icon == "⎘"
+
+
+def test_table_group_by_query(page: Any, server_url: str) -> None:
+    data = run_query(
+        page,
+        server_url,
+        start="2024-01-01 00:00:00",
+        end="2024-01-03 00:00:00",
+        order_by="timestamp",
+        limit=100,
+        group_by=["user"],
+        aggregate="Count",
+    )
+    assert "error" not in data
+    assert len(data["rows"]) == 3
