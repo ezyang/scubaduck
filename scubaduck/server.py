@@ -283,10 +283,10 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
         if params.group_by:
             agg = (params.aggregate or "avg").lower()
-            if agg.startswith("p") or agg in {"avg", "sum"}:
+            if agg.startswith("p") or agg == "sum":
                 need_numeric = True
                 allow_time = False
-            elif agg in {"min", "max"}:
+            elif agg == "avg" or agg in {"min", "max"}:
                 need_numeric = False
                 allow_time = True
             else:

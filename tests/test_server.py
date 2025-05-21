@@ -321,3 +321,29 @@ def test_samples_view_rejects_group_by() -> None:
     data = rv.get_json()
     assert rv.status_code == 400
     assert "only valid" in data["error"]
+
+
+def test_table_avg_with_timestamp() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
+        "order_by": "user",
+        "limit": 100,
+        "columns": ["user", "timestamp", "value"],
+        "group_by": ["user"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert "error" not in data
+    rows = data["rows"]
+    assert rows[0][0] == "alice"
+    from dateutil import parser
+
+    ts = parser.parse(rows[0][1]).replace(tzinfo=None)
+    assert ts == parser.parse("2024-01-01 12:00:00")
