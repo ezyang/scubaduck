@@ -3,6 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 
+def select_value(page: Any, selector: str, value: str) -> None:
+    page.evaluate(
+        "arg => setSelectValue(arg.sel, arg.val)",
+        {"sel": selector, "val": value},
+    )
+
+
 def run_query(
     page: Any,
     url: str,
@@ -24,20 +31,20 @@ def run_query(
     if end is not None:
         page.fill("#end", end)
     if order_by is not None:
-        page.select_option("#order_by", order_by)
+        select_value(page, "#order_by", order_by)
     if order_dir is not None and order_dir == "DESC":
         page.click("#order_dir")
     if limit is not None:
         page.fill("#limit", str(limit))
     if group_by is not None:
-        page.select_option("#graph_type", "table")
+        select_value(page, "#graph_type", "table")
         page.evaluate(
             "g => { groupBy.chips = g; groupBy.renderChips(); }",
             group_by,
         )
     if aggregate is not None:
-        page.select_option("#graph_type", "table")
-        page.select_option("#aggregate", aggregate)
+        select_value(page, "#graph_type", "table")
+        select_value(page, "#aggregate", aggregate)
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -95,7 +102,10 @@ def test_simple_filter(page: Any, server_url: str) -> None:
     page.click("text=Add Filter")
     filter_el = page.query_selector("#filters .filter:last-child")
     assert filter_el
-    filter_el.query_selector(".f-col").select_option("user")
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": filter_el, "val": "user"},
+    )
     val_input = filter_el.query_selector(".f-val")
     val_input.click()
     page.keyboard.type("alice")
@@ -158,7 +168,7 @@ def test_header_and_tabs(page: Any, server_url: str) -> None:
 def test_graph_type_table_fields(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
-    page.select_option("#graph_type", "table")
+    select_value(page, "#graph_type", "table")
     assert page.is_visible("#group_by_field")
     assert page.is_visible("#aggregate_field")
     assert page.is_visible("#show_hits_field")
@@ -300,7 +310,7 @@ def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
     page.click("text=View Settings")
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-02 00:00:00")
-    page.select_option("#order_by", "timestamp")
+    select_value(page, "#order_by", "timestamp")
     page.fill("#limit", "10")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
@@ -350,7 +360,10 @@ def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
     page.click("text=Add Filter")
     f = page.query_selector("#filters .filter:last-child")
     assert f
-    f.query_selector(".f-col").select_option("user")
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
     inp = f.query_selector(".f-val")
     inp.click()
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
@@ -375,7 +388,10 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
     page.click("text=Add Filter")
     f = page.query_selector("#filters .filter:last-child")
     assert f
-    f.query_selector(".f-col").select_option("user")
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
     inp = f.query_selector(".f-val")
     inp.click()
     page.keyboard.type("alice")
@@ -416,7 +432,10 @@ def test_chip_dropdown_hides_on_outside_click(page: Any, server_url: str) -> Non
     page.click("text=Add Filter")
     f = page.query_selector("#filters .filter:last-child")
     assert f
-    f.query_selector(".f-col").select_option("user")
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
     inp = f.query_selector(".f-val")
     inp.click()
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
