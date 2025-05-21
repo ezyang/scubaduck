@@ -614,7 +614,6 @@ function initChipInput(filter, fetchOptions) {
         chips.pop();
         renderChips();
       }
-      hideDropdown();
     } else if (e.key === 'Enter') {
       if (dropdown.style.display !== 'none' && dropdown.children.length > 0) {
         const val = dropdown.children[highlight].dataset.value;
@@ -650,6 +649,7 @@ function initChipInput(filter, fetchOptions) {
         evt.preventDefault();
         addChip(v);
         hideDropdown();
+        input.blur();
       });
       dropdown.appendChild(d);
     });
@@ -676,7 +676,7 @@ function initChipInput(filter, fetchOptions) {
   input.addEventListener('input', loadOptions);
 
   document.addEventListener('click', evt => {
-    if (!filter.contains(evt.target)) {
+    if (evt.target !== input) {
       hideDropdown();
     }
   });

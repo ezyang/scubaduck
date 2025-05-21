@@ -510,6 +510,79 @@ def test_chip_delete_keeps_focus(page: Any, server_url: str) -> None:
     assert visible == "block"
 
 
+def test_chip_click_blurs_input(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
+    page.keyboard.type("ali")
+    page.wait_for_selector(
+        "#filters .filter:last-child .chip-dropdown div:text('alice')"
+    )
+    page.click("#filters .filter:last-child .chip-dropdown div:text('alice')")
+    focused = page.evaluate(
+        "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
+    )
+    assert not focused
+    visible = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .chip-dropdown')).display"
+    )
+    assert visible == "none"
+
+
+def test_chip_dropdown_hides_on_column_click(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
+    f.query_selector(".f-col + .dropdown-display").click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown", state="hidden")
+
+
+def test_chip_backspace_keeps_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
+    page.keyboard.press("Backspace")
+    page.wait_for_selector("#filters .filter:last-child .chip", state="detached")
+    focused = page.evaluate(
+        "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
+    )
+    assert focused
+    visible = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .chip-dropdown')).display"
+    )
+    assert visible == "block"
+
+
 def test_table_enhancements(page: Any, server_url: str) -> None:
     run_query(
         page,
