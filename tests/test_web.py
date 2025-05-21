@@ -196,6 +196,20 @@ def test_graph_type_timeseries_fields(page: Any, server_url: str) -> None:
     assert page.is_visible("#fill_field")
 
 
+def test_timeseries_default_query(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert "error" not in data
+    assert page.is_visible("#chart")
+    page.click("text=Columns")
+    assert not page.is_checked("#column_groups input[value='timestamp']")
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
