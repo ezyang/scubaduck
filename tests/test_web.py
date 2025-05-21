@@ -223,6 +223,36 @@ def test_timeseries_single_bucket(page: Any, server_url: str) -> None:
     assert path is not None and "NaN" not in path
 
 
+def test_timeseries_fill_options(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-02 03:00:00")
+    select_value(page, "#graph_type", "timeseries")
+    select_value(page, "#granularity", "1 hour")
+
+    select_value(page, "#fill", "0")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    path_zero = page.get_attribute("#chart path", "d")
+    assert path_zero is not None and path_zero.count("L") > 20
+
+    select_value(page, "#fill", "connect")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    path_conn = page.get_attribute("#chart path", "d")
+    assert path_conn is not None and path_conn.count("M") == 1
+
+    select_value(page, "#fill", "blank")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    path_blank = page.get_attribute("#chart path", "d")
+    assert path_blank is not None and path_blank.count("M") > 1
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, cast
 
 import re
 from datetime import datetime, timedelta, timezone
@@ -429,6 +429,32 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                             ),
                             400,
                         )
+        if params.start is None or params.end is None:
+            axis = params.x_axis or "timestamp"
+            row = cast(
+                tuple[datetime | None, datetime | None],
+                con.execute(f"SELECT min({axis}), max({axis}) FROM events").fetchall()[
+                    0
+                ],
+            )
+            mn, mx = row
+            if params.start is None and mn is not None:
+                params.start = (
+                    mn.strftime("%Y-%m-%d %H:%M:%S") if not isinstance(mn, str) else mn
+                )
+            if params.end is None and mx is not None:
+                params.end = (
+                    mx.strftime("%Y-%m-%d %H:%M:%S") if not isinstance(mx, str) else mx
+                )
+
+        bucket_size: int | None = None
+        if params.graph_type == "timeseries":
+            bucket_size = _granularity_seconds(
+                params.granularity,
+                params.start if isinstance(params.start, str) else None,
+                params.end if isinstance(params.end, str) else None,
+            )
+
         sql = build_query(params, column_types)
         try:
             rows = con.execute(sql).fetchall()
@@ -439,7 +465,15 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 jsonify({"sql": sql, "error": str(exc), "traceback": tb}),
                 400,
             )
-        return jsonify({"sql": sql, "rows": rows})
+
+        result: Dict[str, Any] = {"sql": sql, "rows": rows}
+        if params.start is not None:
+            result["start"] = str(params.start)
+        if params.end is not None:
+            result["end"] = str(params.end)
+        if bucket_size is not None:
+            result["bucket_size"] = bucket_size
+        return jsonify(result)
 
     return app
 
