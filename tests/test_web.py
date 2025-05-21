@@ -845,3 +845,22 @@ def test_format_number_function(page: Any, server_url: str) -> None:
         "() => [formatNumber(815210), formatNumber(999.999), formatNumber(0.0004), formatNumber(0)]"
     )
     assert vals == ["815.21 K", "999.999", "0.000", "0"]
+
+
+def test_derived_column_query(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.click("text=Add Derived")
+    expr = page.query_selector("#derived_list .derived textarea")
+    assert expr
+    expr.fill("value * 2")
+    page.click("text=View Settings")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-03 00:00:00")
+    page.fill("#limit", "10")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert data["rows"][0][-1] == 20

@@ -388,3 +388,22 @@ def test_timeseries_string_column_error() -> None:
     data = rv.get_json()
     assert rv.status_code == 400
     assert "Aggregate" in data["error"]
+
+
+def test_derived_column_basic() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "limit": 10,
+        "columns": ["timestamp"],
+        "derived_columns": {"val2": "value * 2"},
+        "filters": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["rows"][0][1] == 20
