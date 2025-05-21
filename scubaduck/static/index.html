@@ -56,16 +56,32 @@
     .rel-dropdown div { padding: 2px 4px; cursor: pointer; }
     .rel-dropdown div:hover { background: #bde4ff; }
     .dropdown { position: relative; display: inline-block; }
-    .dropdown-display { border: 1px solid #ccc; padding: 2px 18px 2px 4px; cursor: pointer; min-width: 80px; }
+    .dropdown-display {
+      border: 1px solid #ccc;
+      padding: 2px 18px 2px 4px;
+      cursor: pointer;
+      min-width: 80px;
+      position: relative;
+    }
+    .dropdown-display::after {
+      content: '\25BC';
+      position: absolute;
+      right: 4px;
+      pointer-events: none;
+    }
     .dropdown-menu { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #ccc; z-index: 10; max-height: 160px; overflow-y: auto; display: none; }
     .dropdown-menu input { width: 100%; box-sizing: border-box; padding: 2px 4px; border: none; border-bottom: 1px solid #ccc; }
     .dropdown-menu div { padding: 2px 4px; cursor: pointer; }
     .dropdown-menu div.selected { background: #bde4ff; }
-    .dropdown-menu div:hover { background: #eee; }
+    .dropdown-menu .option:hover { background: #eee; }
+    .dropdown-menu input::placeholder { color: #999; }
     #filters .filter button.remove {
       margin-left: 5px;
       width: 20px;
       flex: 0 0 auto;
+      padding: 0;
+      text-align: center;
+      line-height: 1;
     }
     #filters h4 { margin: 0 0 5px 0; }
     table { border-collapse: collapse; min-width: 100%; }
@@ -232,6 +248,7 @@ function initDropdown(select) {
   const menu = document.createElement('div');
   menu.className = 'dropdown-menu';
   const search = document.createElement('input');
+  search.placeholder = 'Search';
   menu.appendChild(search);
   const list = document.createElement('div');
   menu.appendChild(list);
@@ -267,8 +284,24 @@ function initDropdown(select) {
     Array.from(select.options).forEach(o => {
       if (!o.textContent.toLowerCase().includes(q)) return;
       const div = document.createElement('div');
-      div.textContent = o.textContent;
-      if (o.value === select.value) div.className = 'selected';
+      div.className = 'option';
+      if (q) {
+        const text = o.textContent;
+        const idx = text.toLowerCase().indexOf(q);
+        if (idx !== -1) {
+          div.innerHTML =
+            text.slice(0, idx) +
+            '<u>' +
+            text.slice(idx, idx + q.length) +
+            '</u>' +
+            text.slice(idx + q.length);
+        } else {
+          div.textContent = text;
+        }
+      } else {
+        div.textContent = o.textContent;
+      }
+      if (o.value === select.value) div.classList.add('selected');
       div.addEventListener('mousedown', evt => {
         evt.preventDefault();
         select.value = o.value;
@@ -419,7 +452,6 @@ fetch('/api/columns').then(r => r.json()).then(cols => {
   );
   initDropdown(orderSelect);
   initDropdown(document.getElementById('aggregate'));
-  initDropdown(graphTypeSel);
   updateDisplayTypeUI();
   addFilter();
   initFromUrl();
@@ -697,7 +729,6 @@ function addFilter() {
 
   colSel.addEventListener('change', populateOps);
   container.querySelector('.f-op').addEventListener('change', updateInputVis);
-  initDropdown(container.querySelector('.f-op'));
   populateOps();
   document.getElementById('filter_list').appendChild(container);
   initChipInput(container, (typed, el) => {
