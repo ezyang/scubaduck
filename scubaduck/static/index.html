@@ -551,8 +551,7 @@ function initChipInput(filter, fetchOptions) {
   const chipsEl = filter.querySelector('.chip-input');
   const dropdown = filter.querySelector('.chip-dropdown');
   const copyBtn = filter.querySelector('.chip-copy');
-  const chips = [];
-  filter.chips = chips;
+  filter.chips = [];
   filter.renderChips = renderChips;
   filter.addChip = addChip;
   let highlight = 0;
@@ -564,7 +563,7 @@ function initChipInput(filter, fetchOptions) {
 
     function renderChips() {
       chipsEl.querySelectorAll('.chip').forEach(c => c.remove());
-      chips.forEach((v, i) => {
+      filter.chips.forEach((v, i) => {
         const span = document.createElement('span');
         span.className = 'chip';
         span.textContent = v;
@@ -573,7 +572,7 @@ function initChipInput(filter, fetchOptions) {
         x.textContent = '✖';
         x.addEventListener('click', e => {
           e.stopPropagation();
-          chips.splice(i, 1);
+          filter.chips.splice(i, 1);
           renderChips();
           input.focus();
         });
@@ -601,13 +600,18 @@ function initChipInput(filter, fetchOptions) {
 
   function addChip(val) {
     if (!val) return;
-    chips.push(val);
+    const i = filter.chips.indexOf(val);
+    if (i !== -1) {
+      filter.chips.splice(i, 1);
+    } else {
+      filter.chips.push(val);
+    }
     input.value = '';
     renderChips();
   }
 
   copyBtn.addEventListener('click', () => {
-    navigator.clipboard && navigator.clipboard.writeText(chips.join(','));
+    navigator.clipboard && navigator.clipboard.writeText(filter.chips.join(','));
   });
 
   input.addEventListener('paste', e => {
@@ -635,8 +639,8 @@ function initChipInput(filter, fetchOptions) {
       }
       e.preventDefault();
     } else if (e.key === 'Backspace' && input.value === '') {
-      if (chips.length > 0) {
-        chips.pop();
+      if (filter.chips.length > 0) {
+        filter.chips.pop();
         renderChips();
       }
     } else if (e.key === 'Enter') {
