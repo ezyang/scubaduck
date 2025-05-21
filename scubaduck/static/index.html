@@ -144,7 +144,7 @@
   </style>
 </head>
 <body>
-  <div id="header">sample.csv - events <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
+  <div id="header">sample.csv - <select id="table"></select> <select id="graph_type"><option value="samples">Samples</option><option value="table">Table</option><option value="timeseries">Time Series</option></select></div>
   <div id="content">
     <div id="sidebar">
       <div id="tabs">
@@ -465,118 +465,152 @@ orderDirBtn.addEventListener('click', () => {
 });
 updateOrderDirButton();
 graphTypeSel.addEventListener('change', updateDisplayTypeUI);
-fetch('/api/columns').then(r => r.json()).then(cols => {
-  const orderSelect = document.getElementById('order_by');
-  const xAxisSelect = document.getElementById('x_axis');
-  const groupsEl = document.getElementById('column_groups');
-  const groups = {
-    time: {name: 'Time', cols: [], ul: null},
-    integer: {name: 'Integers', cols: [], ul: null},
-    string: {name: 'Strings', cols: [], ul: null}
-  };
-  cols.forEach(c => {
-    const t = c.type.toUpperCase();
-    columnTypes[c.name] = c.type;
-    allColumns.push(c.name);
-    baseColumns.push(c.name);
-    let g = 'string';
-    if (t.includes('INT')) g = 'integer';
-    if (t.includes('TIMESTAMP')) {
-      g = 'time';
-      timeColumns.push(c.name);
-      baseTimeColumns.push(c.name);
-    }
-    if (g === 'string') {
-      stringColumns.push(c.name);
-      baseStringColumns.push(c.name);
-    } else {
-      integerColumns.push(c.name);
-      baseIntegerColumns.push(c.name);
-    }
-    groups[g].cols.push(c.name);
-    if (g !== 'string') {
+
+function loadColumns(table) {
+  return fetch('/api/columns?table=' + encodeURIComponent(table)).then(r => r.json()).then(cols => {
+    const orderSelect = document.getElementById('order_by');
+    const xAxisSelect = document.getElementById('x_axis');
+    const groupsEl = document.getElementById('column_groups');
+    orderSelect.innerHTML = '';
+    xAxisSelect.innerHTML = '';
+    groupsEl.innerHTML = '';
+    allColumns.length = 0;
+    stringColumns.length = 0;
+    integerColumns.length = 0;
+    timeColumns.length = 0;
+    baseColumns.length = 0;
+    baseStringColumns.length = 0;
+    baseIntegerColumns.length = 0;
+    baseTimeColumns.length = 0;
+    for (const k in columnTypes) delete columnTypes[k];
+    const groups = {
+      time: {name: 'Time', cols: [], ul: null},
+      integer: {name: 'Integers', cols: [], ul: null},
+      string: {name: 'Strings', cols: [], ul: null},
+    };
+    cols.forEach(c => {
+      const t = c.type.toUpperCase();
+      columnTypes[c.name] = c.type;
+      allColumns.push(c.name);
+      baseColumns.push(c.name);
+      let g = 'string';
+      if (t.includes('INT')) g = 'integer';
+      if (t.includes('TIMESTAMP')) {
+        g = 'time';
+        timeColumns.push(c.name);
+        baseTimeColumns.push(c.name);
+      }
+      if (g === 'string') {
+        stringColumns.push(c.name);
+        baseStringColumns.push(c.name);
+      } else {
+        integerColumns.push(c.name);
+        baseIntegerColumns.push(c.name);
+      }
+      groups[g].cols.push(c.name);
+      if (g !== 'string') {
+        const o = document.createElement('option');
+        o.value = c.name;
+        o.textContent = c.name;
+        orderSelect.appendChild(o);
+      }
+    });
+    timeColumns.forEach(name => {
       const o = document.createElement('option');
-      o.value = c.name;
-      o.textContent = c.name;
-      orderSelect.appendChild(o);
-    }
+      o.value = name;
+      o.textContent = name;
+      xAxisSelect.appendChild(o);
+    });
+    Object.keys(groups).forEach(key => {
+      const g = groups[key];
+      const div = document.createElement('div');
+      div.className = 'col-group';
+      const header = document.createElement('div');
+      header.className = 'col-group-header';
+      header.appendChild(document.createTextNode(g.name + ': '));
+      const links = document.createElement('span');
+      links.className = 'links';
+      const allBtn = document.createElement('a');
+      allBtn.href = '#';
+      allBtn.textContent = 'All';
+      const noneBtn = document.createElement('a');
+      noneBtn.href = '#';
+      noneBtn.textContent = 'None';
+      links.appendChild(allBtn);
+      links.appendChild(noneBtn);
+      header.appendChild(links);
+      div.appendChild(header);
+      const ul = document.createElement('ul');
+      g.ul = ul;
+      g.cols.forEach(name => {
+        const li = document.createElement('li');
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = name;
+        cb.checked = true;
+        cb.addEventListener('change', updateSelectedColumns);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + name));
+        li.appendChild(label);
+        ul.appendChild(li);
+      });
+      allBtn.addEventListener('click', e => {
+        e.preventDefault();
+        ul.querySelectorAll('input').forEach(cb => (cb.checked = true));
+        updateSelectedColumns();
+      });
+      noneBtn.addEventListener('click', e => {
+        e.preventDefault();
+        ul.querySelectorAll('input').forEach(cb => (cb.checked = false));
+        updateSelectedColumns();
+      });
+      div.appendChild(ul);
+      groupsEl.appendChild(div);
+    });
+    document.getElementById('columns_all').addEventListener('click', e => {
+      e.preventDefault();
+      groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = true));
+      updateSelectedColumns();
+    });
+    document.getElementById('columns_none').addEventListener('click', e => {
+      e.preventDefault();
+      groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = false));
+      updateSelectedColumns();
+    });
+    updateSelectedColumns();
+    groupBy = document.getElementById('group_by').closest('.field');
+    initChipInput(groupBy, typed =>
+      allColumns.filter(c => c.toLowerCase().includes(typed.toLowerCase()))
+    );
+    initDropdown(orderSelect);
+    initDropdown(document.getElementById('aggregate'));
   });
-  timeColumns.forEach(name => {
+}
+
+let columnsInitialized = false;
+fetch('/api/tables').then(r => r.json()).then(tables => {
+  tables.forEach(t => {
     const o = document.createElement('option');
-    o.value = name;
-    o.textContent = name;
-    xAxisSelect.appendChild(o);
+    o.value = t;
+    o.textContent = t;
+    document.getElementById('table').appendChild(o);
   });
-  Object.keys(groups).forEach(key => {
-    const g = groups[key];
-    const div = document.createElement('div');
-    div.className = 'col-group';
-    const header = document.createElement('div');
-    header.className = 'col-group-header';
-    header.appendChild(document.createTextNode(g.name + ': '));
-    const links = document.createElement('span');
-    links.className = 'links';
-    const allBtn = document.createElement('a');
-    allBtn.href = '#';
-    allBtn.textContent = 'All';
-    const noneBtn = document.createElement('a');
-    noneBtn.href = '#';
-    noneBtn.textContent = 'None';
-    links.appendChild(allBtn);
-    links.appendChild(noneBtn);
-    header.appendChild(links);
-    div.appendChild(header);
-    const ul = document.createElement('ul');
-    g.ul = ul;
-    g.cols.forEach(name => {
-      const li = document.createElement('li');
-      const label = document.createElement('label');
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = name;
-      cb.checked = true;
-      cb.addEventListener('change', updateSelectedColumns);
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + name));
-      li.appendChild(label);
-      ul.appendChild(li);
+  const table = parseSearch().table || tables[0];
+  document.getElementById('table').value = table;
+  loadColumns(table).then(() => {
+    updateDisplayTypeUI();
+    addFilter();
+    initFromUrl();
+    columnsInitialized = true;
+  });
+  document.getElementById('table').addEventListener('change', () => {
+    loadColumns(document.getElementById('table').value).then(() => {
+      if (columnsInitialized) {
+        applyParams(parseSearch());
+      }
     });
-    allBtn.addEventListener('click', e => {
-      e.preventDefault();
-      ul.querySelectorAll('input').forEach(cb => (cb.checked = true));
-      updateSelectedColumns();
-    });
-    noneBtn.addEventListener('click', e => {
-      e.preventDefault();
-      ul.querySelectorAll('input').forEach(cb => (cb.checked = false));
-      updateSelectedColumns();
-    });
-    div.appendChild(ul);
-    groupsEl.appendChild(div);
   });
-  document.getElementById('columns_all').addEventListener('click', e => {
-    e.preventDefault();
-    groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = true));
-    updateSelectedColumns();
-  });
-  document.getElementById('columns_none').addEventListener('click', e => {
-    e.preventDefault();
-    groupsEl.querySelectorAll('input').forEach(cb => (cb.checked = false));
-    updateSelectedColumns();
-  });
-  updateSelectedColumns();
-  groupBy = document.getElementById('group_by').closest('.field');
-  initChipInput(groupBy, typed =>
-    allColumns.filter(c => c.toLowerCase().includes(typed.toLowerCase()))
-  );
-  initDropdown(orderSelect);
-  initDropdown(document.getElementById('aggregate'));
-  document.getElementById('limit').addEventListener('input', e => {
-    e.target.dataset.setByUser = '1';
-  });
-  updateDisplayTypeUI();
-  addFilter();
-  initFromUrl();
 });
 
 document.querySelectorAll('#tabs .tab').forEach(btn => {
@@ -849,6 +883,7 @@ function dive(push=true) {
 function collectParams() {
   updateSelectedColumns();
   const payload = {
+    table: document.getElementById('table').value,
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
@@ -890,6 +925,7 @@ function collectParams() {
 
 function paramsToSearch(params) {
   const sp = new URLSearchParams();
+  if (params.table) sp.set('table', params.table);
   if (params.start) sp.set('start', params.start);
   if (params.end) sp.set('end', params.end);
   if (params.order_by) sp.set('order_by', params.order_by);
@@ -914,6 +950,7 @@ function paramsToSearch(params) {
 }
 
 function applyParams(params) {
+  if (params.table) document.getElementById('table').value = params.table;
   document.getElementById('start').value = params.start || '';
   document.getElementById('end').value = params.end || '';
   if (params.order_by) {
@@ -971,6 +1008,7 @@ function applyParams(params) {
 function parseSearch() {
   const sp = new URLSearchParams(window.location.search);
   const params = {};
+  if (sp.has('table')) params.table = sp.get('table');
   if (sp.has('start')) params.start = sp.get('start');
   if (sp.has('end')) params.end = sp.get('end');
   if (sp.has('order_by')) params.order_by = sp.get('order_by');

@@ -13,6 +13,7 @@ def test_basic_query() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-02 00:00:00",
         "order_by": "timestamp",
@@ -45,6 +46,7 @@ def test_filter_multi_token() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-02 03:00:00",
         "order_by": "timestamp",
@@ -68,6 +70,7 @@ def test_empty_filter_is_noop() -> None:
     app = server.app
     client = app.test_client()
     base_payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "limit": 100,
@@ -94,6 +97,7 @@ def test_select_columns() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "order_by": "timestamp",
@@ -152,6 +156,7 @@ def test_string_filter_ops() -> None:
 
 def _make_payload() -> dict[str, object]:
     return {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-02 00:00:00",
         "order_by": "timestamp",
@@ -226,6 +231,7 @@ def test_group_by_table() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "table",
@@ -261,6 +267,7 @@ def test_relative_time_query(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(server, "datetime", FixedDateTime)
 
     payload = {
+        "table": "events",
         "start": "-1 hour",
         "end": "now",
         "order_by": "timestamp",
@@ -281,6 +288,7 @@ def test_invalid_time_error() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "nonsense",
         "end": "now",
         "order_by": "timestamp",
@@ -300,6 +308,7 @@ def test_query_error_returns_sql_and_traceback() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "columns": ["event"],
@@ -318,6 +327,7 @@ def test_table_unknown_column_error() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "table",
@@ -340,6 +350,7 @@ def test_samples_view_rejects_group_by() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "graph_type": "samples",
         "group_by": ["user"],
         "columns": ["timestamp"],
@@ -356,6 +367,7 @@ def test_table_avg_with_timestamp() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "table",
@@ -382,6 +394,7 @@ def test_timeseries_basic() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "timeseries",
@@ -404,6 +417,7 @@ def test_timeseries_orders_by_xaxis() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "timeseries",
@@ -462,6 +476,7 @@ def test_timeseries_string_column_error() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "timeseries",
@@ -482,6 +497,7 @@ def test_derived_column_basic() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "limit": 10,
@@ -501,6 +517,7 @@ def test_timeseries_derived_column() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
         "graph_type": "timeseries",
@@ -522,6 +539,7 @@ def test_default_start_end_returned() -> None:
     app = server.app
     client = app.test_client()
     payload = {
+        "table": "events",
         "order_by": "timestamp",
         "limit": 5,
         "columns": ["timestamp"],
