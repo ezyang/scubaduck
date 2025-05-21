@@ -481,3 +481,20 @@ def test_timeseries_derived_column() -> None:
     assert rv.status_code == 200
     rows = data["rows"]
     assert all(r[2] == r[1] * 2 for r in rows)
+
+
+def test_default_start_end_returned() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "order_by": "timestamp",
+        "limit": 5,
+        "columns": ["timestamp"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["start"] == "2024-01-01 00:00:00"
+    assert data["end"] == "2024-01-02 03:00:00"
