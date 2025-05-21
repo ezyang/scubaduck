@@ -250,6 +250,76 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         )
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
+
+        if params.graph_type != "table" and (
+            params.group_by or params.aggregate or params.show_hits
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "group_by, aggregate and show_hits are only valid for table view"
+                    }
+                ),
+                400,
+            )
+
+        valid_cols = set(column_types.keys())
+        for col in params.columns:
+            if col not in valid_cols:
+                return jsonify({"error": f"Unknown column: {col}"}), 400
+        for col in params.group_by:
+            if col not in valid_cols:
+                return jsonify({"error": f"Unknown column: {col}"}), 400
+        if params.order_by and params.order_by not in valid_cols:
+            return jsonify({"error": f"Unknown column: {params.order_by}"}), 400
+
+        if params.group_by:
+            agg = (params.aggregate or "avg").lower()
+            if agg.startswith("p") or agg in {"avg", "sum"}:
+                need_numeric = True
+                allow_time = False
+            elif agg in {"min", "max"}:
+                need_numeric = False
+                allow_time = True
+            else:
+                need_numeric = False
+                allow_time = False
+            if need_numeric or allow_time:
+                for c in params.columns:
+                    if c in params.group_by:
+                        continue
+                    ctype = column_types.get(c, "").upper()
+                    is_numeric = any(
+                        t in ctype
+                        for t in [
+                            "INT",
+                            "DECIMAL",
+                            "REAL",
+                            "DOUBLE",
+                            "FLOAT",
+                            "NUMERIC",
+                            "HUGEINT",
+                        ]
+                    )
+                    is_time = "TIMESTAMP" in ctype or "DATE" in ctype or "TIME" in ctype
+                    if need_numeric and not is_numeric:
+                        return (
+                            jsonify(
+                                {
+                                    "error": f"Aggregate {agg} cannot be applied to column {c}",
+                                }
+                            ),
+                            400,
+                        )
+                    if allow_time and not (is_numeric or is_time):
+                        return (
+                            jsonify(
+                                {
+                                    "error": f"Aggregate {agg} cannot be applied to column {c}",
+                                }
+                            ),
+                            400,
+                        )
         sql = build_query(params)
         try:
             rows = con.execute(sql).fetchall()
