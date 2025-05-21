@@ -98,9 +98,10 @@ def parse_time(val: str | None) -> str | None:
     return dt.replace(microsecond=0, tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def build_query(params: QueryParams) -> str:
+def build_query(params: QueryParams, column_types: Dict[str, str] | None = None) -> str:
     select_parts: list[str] = []
-    if params.group_by:
+    has_agg = bool(params.group_by) or params.aggregate is not None
+    if has_agg:
         select_parts.extend(params.group_by)
         agg = (params.aggregate or "avg").lower()
 
@@ -110,6 +111,13 @@ def build_query(params: QueryParams) -> str:
                 return f"quantile({col}, {quant})"
             if agg == "count distinct":
                 return f"count(DISTINCT {col})"
+            if agg == "avg" and column_types is not None:
+                ctype = column_types.get(col, "").upper()
+                if "TIMESTAMP" in ctype or "DATE" in ctype or "TIME" in ctype:
+                    return (
+                        "TIMESTAMP 'epoch' + INTERVAL '1 second' * "
+                        f"CAST(avg(epoch({col})) AS BIGINT)"
+                    )
             return f"{agg}({col})"
 
         for col in params.columns:
@@ -320,7 +328,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                             ),
                             400,
                         )
-        sql = build_query(params)
+        sql = build_query(params, column_types)
         try:
             rows = con.execute(sql).fetchall()
         except Exception as exc:
