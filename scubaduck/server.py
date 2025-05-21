@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Tuple
 
 import re
@@ -178,6 +178,27 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             select_parts.insert(len(group_cols), "count(*) AS Hits")
     else:
         select_parts.extend(params.columns)
+
+    if has_agg and params.derived_columns:
+        inner_params = replace(
+            params,
+            derived_columns={},
+            order_by=None,
+            limit=None,
+        )
+        inner_sql = build_query(inner_params, column_types)
+        outer_select = ["t.*"] + [
+            f"{expr} AS {name}" for name, expr in params.derived_columns.items()
+        ]
+        query = f"SELECT {', '.join(outer_select)} FROM ({inner_sql}) t"
+        if params.order_by:
+            query += f" ORDER BY {params.order_by} {params.order_dir}"
+        elif params.graph_type == "timeseries":
+            query += " ORDER BY bucket"
+        if params.limit is not None:
+            query += f" LIMIT {params.limit}"
+        return query
+
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
