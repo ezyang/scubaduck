@@ -396,6 +396,7 @@ def test_chip_copy_and_paste(page: Any, server_url: str) -> None:
     inp.click()
     page.keyboard.type("alice")
     page.keyboard.press("Enter")
+    inp.click()
     page.keyboard.type("bob")
     page.keyboard.press("Enter")
     f.query_selector(".chip-copy").click()
@@ -454,6 +455,60 @@ def test_chip_input_no_outline(page: Any, server_url: str) -> None:
         "getComputedStyle(document.querySelector('#filters .filter:last-child .f-val')).outlineStyle"
     )
     assert outline == "none"
+
+
+def test_chip_enter_blurs_input(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    focused = page.evaluate(
+        "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
+    )
+    assert not focused
+    visible = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .chip-dropdown')).display"
+    )
+    assert visible == "none"
+
+
+def test_chip_delete_keeps_focus(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    inp.click()
+    page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
+    f.query_selector(".chip .x").click()
+    page.wait_for_selector("#filters .filter:last-child .chip", state="detached")
+    focused = page.evaluate(
+        "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
+    )
+    assert focused
+    visible = page.evaluate(
+        "getComputedStyle(document.querySelector('#filters .filter:last-child .chip-dropdown')).display"
+    )
+    assert visible == "block"
 
 
 def test_table_enhancements(page: Any, server_url: str) -> None:
