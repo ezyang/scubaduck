@@ -146,10 +146,10 @@
         <div id="group_by_field" class="field" style="display:none;">
           <label>Group By</label>
           <div class="chip-box">
-            <div class="chip-input">
+          <div class="chip-input">
               <input id="group_by" class="f-val" type="text">
-              <button type="button" class="chip-copy">\u2398</button>
-            </div>
+              <button type="button" class="chip-copy">&#x2398;</button>
+          </div>
             <div class="chip-dropdown"></div>
           </div>
         </div>
@@ -543,24 +543,27 @@ function initChipInput(filter) {
 
   function loadOptions() {
     const colSel = filter.querySelector('.f-col');
-    if (!colSel) return;
-    const col = colSel.value;
-    if (!isStringColumn(col)) {
-      dropdown.innerHTML = '';
-      return;
+    if (colSel) {
+      const col = colSel.value;
+      if (!isStringColumn(col)) {
+        dropdown.innerHTML = '';
+        return;
+      }
+      fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(input.value)}`)
+        .then(r => r.json())
+        .then(data => {
+          options = data;
+          renderDropdown(options.slice());
+        });
+    } else if (filter === groupBy) {
+      const typed = input.value.toLowerCase();
+      const opts = allColumns.filter(c => c.toLowerCase().includes(typed));
+      renderDropdown(opts);
     }
-    fetch(`/api/samples?column=${encodeURIComponent(col)}&q=${encodeURIComponent(input.value)}`)
-      .then(r => r.json())
-      .then(data => {
-        options = data;
-        renderDropdown(options.slice());
-      });
   }
 
-  if (filter.querySelector('.f-col')) {
-    input.addEventListener('focus', loadOptions);
-    input.addEventListener('input', loadOptions);
-  }
+  input.addEventListener('focus', loadOptions);
+  input.addEventListener('input', loadOptions);
 
   document.addEventListener('click', evt => {
     if (!filter.contains(evt.target)) {
@@ -581,7 +584,7 @@ function addFilter() {
     <div class="chip-box">
       <div class="chip-input">
         <input class="f-val" type="text">
-        <button type="button" class="chip-copy">\u2398</button>
+        <button type="button" class="chip-copy">&#x2398;</button>
       </div>
       <div class="chip-dropdown"></div>
     </div>
@@ -711,7 +714,7 @@ function applyParams(params) {
   graphTypeSel.value = params.graph_type || 'samples';
   updateDisplayTypeUI();
   if (params.group_by) {
-    groupBy.chips = params.group_by.slice();
+    groupBy.chips.splice(0, groupBy.chips.length, ...params.group_by);
     groupBy.renderChips();
   }
   if (params.aggregate) document.getElementById('aggregate').value = params.aggregate;

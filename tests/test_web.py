@@ -520,3 +520,32 @@ def test_empty_data_message(page: Any, server_url: str) -> None:
     assert data["rows"] == []
     msg = page.text_content("#view")
     assert "Empty data provided to table" in msg
+
+
+def test_group_by_chip_from_url(page: Any, server_url: str) -> None:
+    url = f"{server_url}?graph_type=table&group_by=user&order_by=user&limit=10"
+    page.goto(url)
+    page.wait_for_selector("#group_by_field .chip", state="attached")
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#group_by_field .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips == ["user"]
+
+
+def test_group_by_autocomplete(page: Any, server_url: str) -> None:
+    page.goto(f"{server_url}?graph_type=table")
+    page.wait_for_selector("#group_by_field", state="visible")
+    inp = page.query_selector("#group_by_field .f-val")
+    assert inp
+    inp.click()
+    page.keyboard.type("us")
+    page.wait_for_selector("#group_by_field .chip-dropdown div")
+    options = page.locator("#group_by_field .chip-dropdown div").all_inner_texts()
+    assert "user" in options
+
+
+def test_group_by_copy_icon(page: Any, server_url: str) -> None:
+    page.goto(f"{server_url}?graph_type=table")
+    page.wait_for_selector("#group_by_field", state="visible")
+    icon = page.text_content("#group_by_field .chip-copy")
+    assert icon == "⎘"
