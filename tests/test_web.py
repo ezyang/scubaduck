@@ -269,7 +269,7 @@ def test_invalid_time_error_shown(page: Any, server_url: str) -> None:
     assert "nonsense" in msg
 
 
-def test_query_error_shown(page: Any, server_url: str) -> None:
+def test_table_avg_group_by(page: Any, server_url: str) -> None:
     data = run_query(
         page,
         server_url,
@@ -279,9 +279,8 @@ def test_query_error_shown(page: Any, server_url: str) -> None:
         group_by=["user"],
         aggregate="Avg",
     )
-    assert "error" in data
-    msg = page.text_content("#view")
-    assert "Aggregate avg" in msg
+    assert "error" not in data
+    assert len(data["rows"]) == 3
 
 
 def test_column_toggle_and_selection(page: Any, server_url: str) -> None:
