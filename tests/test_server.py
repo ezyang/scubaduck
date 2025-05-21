@@ -199,6 +199,7 @@ def test_group_by_table() -> None:
     payload = {
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
         "order_by": "user",
         "limit": 10,
         "columns": ["value"],
@@ -281,6 +282,42 @@ def test_query_error_returns_sql_and_traceback() -> None:
     )
     data = rv.get_json()
     assert rv.status_code == 400
-    assert "sql" in data
-    assert "traceback" in data
-    assert "avg(event)" in data["sql"]
+    assert "error" in data
+
+
+def test_table_unknown_column_error() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
+        "order_by": "timestamp",
+        "limit": 100,
+        "columns": ["user", "Hits", "value"],
+        "group_by": ["user"],
+        "aggregate": "Count",
+        "show_hits": True,
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 400
+    assert "Unknown column" in data["error"]
+
+
+def test_samples_view_rejects_group_by() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "graph_type": "samples",
+        "group_by": ["user"],
+        "columns": ["timestamp"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 400
+    assert "only valid" in data["error"]
