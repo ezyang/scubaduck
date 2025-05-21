@@ -370,6 +370,30 @@ def test_timeseries_basic() -> None:
     assert len(data["rows"]) == 4
 
 
+def test_timeseries_orders_by_xaxis() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "limit": 100,
+        "columns": ["value"],
+        "x_axis": "timestamp",
+        "granularity": "1 day",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    rows = data["rows"]
+    from dateutil import parser
+
+    timestamps = [parser.parse(r[0]).replace(tzinfo=None) for r in rows]
+    assert timestamps == sorted(timestamps)
+
+
 def test_timeseries_string_column_error() -> None:
     app = server.app
     client = app.test_client()
