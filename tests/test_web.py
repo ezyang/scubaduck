@@ -132,6 +132,15 @@ def test_default_filter_and_layout(page: Any, server_url: str) -> None:
     assert position == "static"
 
 
+def test_filter_remove_alignment(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    diff = page.evaluate(
+        "() => { const r=document.querySelector('#filters .filter-row').getBoundingClientRect(); const x=document.querySelector('#filters .filter-row button.remove').getBoundingClientRect(); return Math.abs(r.right - x.right); }"
+    )
+    assert diff <= 1
+
+
 def test_header_and_tabs(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
