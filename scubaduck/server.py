@@ -219,6 +219,8 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         query += " GROUP BY " + ", ".join(group_cols)
     if params.order_by:
         query += f" ORDER BY {params.order_by} {params.order_dir}"
+    elif params.graph_type == "timeseries":
+        query += " ORDER BY bucket"
     if params.limit is not None:
         query += f" LIMIT {params.limit}"
     return query
