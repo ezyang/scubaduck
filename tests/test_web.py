@@ -605,6 +605,33 @@ def test_chip_backspace_keeps_dropdown(page: Any, server_url: str) -> None:
     assert visible == "block"
 
 
+def test_chip_duplicate_toggles(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Add Filter")
+    f = page.query_selector("#filters .filter:last-child")
+    assert f
+    page.evaluate(
+        "arg => setSelectValue(arg.el.querySelector('.f-col'), arg.val)",
+        {"el": f, "val": "user"},
+    )
+    inp = f.query_selector(".f-val")
+    inp.click()
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips == ["alice"]
+    inp.click()
+    page.keyboard.type("alice")
+    page.keyboard.press("Enter")
+    chips = page.evaluate(
+        "Array.from(document.querySelectorAll('#filters .filter:last-child .chip')).map(c => c.firstChild.textContent)"
+    )
+    assert chips == []
+
+
 def test_table_enhancements(page: Any, server_url: str) -> None:
     run_query(
         page,
