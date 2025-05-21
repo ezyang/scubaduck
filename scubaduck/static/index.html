@@ -556,6 +556,7 @@ function initChipInput(filter, fetchOptions) {
   filter.renderChips = renderChips;
   filter.addChip = addChip;
   let highlight = 0;
+  let dropdownLocked = false;
 
   chipsEl.addEventListener('click', () => {
     input.focus();
@@ -570,13 +571,11 @@ function initChipInput(filter, fetchOptions) {
         const x = document.createElement('span');
         x.className = 'x';
         x.textContent = '✖';
-        x.addEventListener('click', () => {
-          const wasFocused = document.activeElement === input;
+        x.addEventListener('click', e => {
+          e.stopPropagation();
           chips.splice(i, 1);
           renderChips();
-          if (wasFocused) {
-            input.focus();
-          }
+          input.focus();
         });
         span.appendChild(x);
         chipsEl.insertBefore(span, input);
@@ -585,10 +584,11 @@ function initChipInput(filter, fetchOptions) {
 
   function hideDropdown() {
     dropdown.style.display = 'none';
+    dropdownLocked = true;
   }
 
   function showDropdown() {
-    if (document.activeElement === input) {
+    if (!dropdownLocked && document.activeElement === input) {
       dropdown.style.display = 'block';
     }
   }
@@ -651,7 +651,6 @@ function initChipInput(filter, fetchOptions) {
         addChip(input.value.trim());
       }
       hideDropdown();
-      input.blur();
       e.preventDefault();
     }
   });
@@ -688,6 +687,7 @@ function initChipInput(filter, fetchOptions) {
   }
 
   function loadOptions() {
+    dropdownLocked = false;
     if (!fetchOptions) {
       dropdown.innerHTML = '';
       return;

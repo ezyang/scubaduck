@@ -465,7 +465,7 @@ def test_chip_input_no_outline(page: Any, server_url: str) -> None:
     assert outline == "none"
 
 
-def test_chip_enter_blurs_input(page: Any, server_url: str) -> None:
+def test_chip_enter_keeps_focus(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
     page.click("text=Add Filter")
@@ -483,7 +483,7 @@ def test_chip_enter_blurs_input(page: Any, server_url: str) -> None:
     focused = page.evaluate(
         "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
     )
-    assert not focused
+    assert focused
     visible = page.evaluate(
         "getComputedStyle(document.querySelector('#filters .filter:last-child .chip-dropdown')).display"
     )
@@ -505,7 +505,7 @@ def test_chip_delete_keeps_focus(page: Any, server_url: str) -> None:
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
     page.keyboard.type("alice")
     page.keyboard.press("Enter")
-    inp.click()
+    page.keyboard.type("b")
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown")
     f.query_selector(".chip .x").click()
     page.wait_for_selector("#filters .filter:last-child .chip", state="detached")
@@ -578,10 +578,12 @@ def test_chip_backspace_keeps_dropdown(page: Any, server_url: str) -> None:
     inp.click()
     page.keyboard.type("alice")
     page.keyboard.press("Enter")
-    inp.click()
+    page.keyboard.type("b")
     page.wait_for_selector("#filters .filter:last-child .chip-dropdown div")
     page.keyboard.press("Backspace")
-    page.wait_for_selector("#filters .filter:last-child .chip", state="detached")
+    page.wait_for_function(
+        "document.querySelector('#filters .filter:last-child .f-val').value === ''"
+    )
     focused = page.evaluate(
         "document.activeElement === document.querySelector('#filters .filter:last-child .f-val')"
     )
