@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import duckdb
 from scubaduck import server
@@ -421,6 +422,40 @@ def test_timeseries_orders_by_xaxis() -> None:
 
     timestamps = [parser.parse(r[0]).replace(tzinfo=None) for r in rows]
     assert timestamps == sorted(timestamps)
+
+
+def test_timeseries_auto_and_fine_buckets() -> None:
+    app = server.app
+    client = app.test_client()
+
+    def run(gran: str) -> None:
+        payload = {
+            "start": "2024-01-01 00:00:00",
+            "end": "2024-01-02 03:00:00",
+            "graph_type": "timeseries",
+            "columns": ["value"],
+            "x_axis": "timestamp",
+            "granularity": gran,
+        }
+        rv = client.post(
+            "/api/query", data=json.dumps(payload), content_type="application/json"
+        )
+        data = rv.get_json()
+        assert rv.status_code == 200
+        from dateutil import parser
+
+        start = parser.parse(cast(str, payload["start"])).replace(tzinfo=None)
+        buckets = [
+            parser.parse(cast(str, r[0])).replace(tzinfo=None) for r in data["rows"]
+        ]
+        assert buckets[0] == start
+        if len(buckets) > 1:
+            step = (buckets[1] - buckets[0]).total_seconds()
+            assert step % data["bucket_size"] == 0
+        assert any(r[1] != 0 for r in data["rows"])
+
+    run("Auto")
+    run("Fine")
 
 
 def test_timeseries_string_column_error() -> None:

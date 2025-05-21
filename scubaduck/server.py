@@ -145,10 +145,16 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     if params.graph_type == "timeseries":
         sec = _granularity_seconds(params.granularity, params.start, params.end)
         x_axis = params.x_axis or "timestamp"
-        bucket_expr = (
-            f"TIMESTAMP 'epoch' + INTERVAL '{sec} second' * "
-            f"CAST(floor(epoch({x_axis})/{sec}) AS BIGINT)"
-        )
+        if params.start:
+            bucket_expr = (
+                f"TIMESTAMP '{params.start}' + INTERVAL '{sec} second' * "
+                f"CAST(floor((epoch({x_axis}) - epoch(TIMESTAMP '{params.start}'))/{sec}) AS BIGINT)"
+            )
+        else:
+            bucket_expr = (
+                f"TIMESTAMP 'epoch' + INTERVAL '{sec} second' * "
+                f"CAST(floor(epoch({x_axis})/{sec}) AS BIGINT)"
+            )
         select_parts.append(f"{bucket_expr} AS bucket")
         group_cols = ["bucket"] + group_cols
     has_agg = bool(group_cols) or params.aggregate is not None
