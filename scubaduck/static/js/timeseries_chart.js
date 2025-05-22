@@ -251,6 +251,8 @@ function showTimeSeries(data) {
     const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
     const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
     const seriesEls = {};
+    const agg = document.getElementById('aggregate').value.toLowerCase();
+    const groups = {};
     Object.keys(series).forEach(key => {
       const vals = series[key];
       const color = colors[colorIndex++ % colors.length];
@@ -281,11 +283,35 @@ function showTimeSeries(data) {
       el.setAttribute('stroke', color);
       el.setAttribute('stroke-width', '1');
       svg.appendChild(el);
+      const idx = key.lastIndexOf(':');
+      const groupKey = idx === -1 ? 'all' : key.slice(0, idx);
+      const name = idx === -1 ? key : key.slice(idx + 1);
+      let group = groups[groupKey];
+      if (!group) {
+        const gEl = document.createElement('div');
+        gEl.className = 'legend-group';
+        const header = document.createElement('div');
+        header.className = 'legend-header';
+        header.textContent =
+          groupKey === 'all' ? agg : `${groupKey} ${agg}`;
+        gEl.appendChild(header);
+        const items = document.createElement('div');
+        items.className = 'legend-items';
+        gEl.appendChild(items);
+        legend.appendChild(gEl);
+        group = {items};
+        groups[groupKey] = group;
+      }
       const item = document.createElement('div');
-      item.textContent = key;
-      item.style.color = color;
       item.className = 'legend-item';
-      legend.appendChild(item);
+      const label = document.createElement('span');
+      label.textContent = name;
+      label.style.color = color;
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'legend-value';
+      item.appendChild(label);
+      item.appendChild(valueSpan);
+      group.items.appendChild(item);
 
       function highlight(on) {
         el.setAttribute('stroke-width', on ? '3' : '1');
@@ -296,7 +322,7 @@ function showTimeSeries(data) {
       el.addEventListener('mouseleave', () => highlight(false));
       item.addEventListener('mouseenter', () => highlight(true));
       item.addEventListener('mouseleave', () => highlight(false));
-      seriesEls[key] = { path: el, item, highlight, color };
+      seriesEls[key] = { path: el, item, highlight, color, valueEl: valueSpan };
     });
     currentChart.seriesEls = seriesEls;
     currentChart.xScale = xScale;
@@ -344,6 +370,9 @@ function showTimeSeries(data) {
     crosshairLine.style.display = 'none';
     crosshairDots.style.display = 'none';
     crosshairDots.innerHTML = '';
+    Object.values(currentChart.seriesEls).forEach(el => {
+      el.valueEl.textContent = '';
+    });
     if (currentChart.selected) {
       currentChart.seriesEls[currentChart.selected].highlight(false);
       currentChart.selected = null;
@@ -379,8 +408,12 @@ function showTimeSeries(data) {
     Object.keys(currentChart.series).forEach(key => {
       const vals = currentChart.series[key];
       let v = vals[bucket];
-      if (v === undefined && currentChart.fill !== '0') return;
+      if (v === undefined && currentChart.fill !== '0') {
+        currentChart.seriesEls[key].valueEl.textContent = '';
+        return;
+      }
       if (v === undefined) v = 0;
+      currentChart.seriesEls[key].valueEl.textContent = formatNumber(v);
       const yPix = currentChart.yScale(v);
       const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.setAttribute('cx', xPix);
