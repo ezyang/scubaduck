@@ -715,17 +715,30 @@ function loadColumns(table) {
 }
 
 let columnsInitialized = false;
-fetch('/api/tables').then(r => r.json()).then(tables => {
-  const tableSel = document.getElementById('table');
-  tables.forEach(t => {
-    const o = document.createElement('option');
-    o.value = t;
-    o.textContent = t;
-    tableSel.appendChild(o);
-  });
-  initDropdown(tableSel);
-  const table = parseSearch().table || tables[0];
-  tableSel.value = table;
+  fetch('/api/tables').then(r => r.json()).then(tables => {
+    const tableSel = document.getElementById('table');
+    tables.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      tableSel.appendChild(o);
+    });
+    initDropdown(tableSel);
+    const measure = document.createElement('span');
+    measure.style.visibility = 'hidden';
+    measure.style.position = 'absolute';
+    document.body.appendChild(measure);
+    let maxWidth = 0;
+    tables.forEach(t => {
+      measure.textContent = t;
+      const w = measure.getBoundingClientRect().width;
+      if (w > maxWidth) maxWidth = w;
+    });
+    measure.remove();
+    const disp = tableSel.parentElement.querySelector('.dropdown-display');
+    if (disp) disp.style.minWidth = maxWidth + 30 + 'px';
+    const table = parseSearch().table || tables[0];
+    tableSel.value = table;
   loadColumns(table).then(() => {
     updateDisplayTypeUI();
     addFilter();
