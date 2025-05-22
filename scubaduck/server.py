@@ -101,9 +101,14 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
             for t in tables:
                 info = sconn.execute(f'PRAGMA table_info("{t}")').fetchall()
                 col_defs = ", ".join(
-                    f"{r[1]} {_normalize_sqlite_type(cast(str, r[2]))}" for r in info
+                    f'"{r[1]}" {_normalize_sqlite_type(cast(str, r[2]))}' for r in info
                 )
-                con.execute(f'CREATE TABLE "{t}" ({col_defs})')
+                sql = f'CREATE TABLE "{t}" ({col_defs})'
+                try:
+                    con.execute(sql)
+                except Exception:
+                    print(f"Failed SQL: {sql}")
+                    raise
                 placeholders = ",".join("?" for _ in info)
                 for row in sconn.execute(f'SELECT * FROM "{t}"'):
                     con.execute(f'INSERT INTO "{t}" VALUES ({placeholders})', row)
