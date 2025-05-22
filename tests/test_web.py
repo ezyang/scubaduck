@@ -992,3 +992,28 @@ def test_sql_query_display(page: Any, server_url: str) -> None:
     displayed = page.text_content("#sql_query")
     assert displayed is not None
     assert displayed.strip() == sql
+
+
+def test_timeseries_resize(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart path", state="attached")
+
+    def chart_info() -> dict[str, float]:
+        return page.evaluate(
+            "() => {const p=document.querySelector('#chart path'); const nums=p.getAttribute('d').match(/[-0-9.]+/g).map(parseFloat); return {width: parseFloat(document.getElementById('chart').getAttribute('width')), last: nums[nums.length-2]};}"
+        )
+
+    before = chart_info()
+    page.evaluate("document.getElementById('sidebar').style.width='200px'")
+    page.wait_for_function(
+        "width => document.getElementById('chart').getAttribute('width') != width",
+        arg=before["width"],
+    )
+    after = chart_info()
+    assert after["width"] > before["width"]
+    assert after["last"] > before["last"]
