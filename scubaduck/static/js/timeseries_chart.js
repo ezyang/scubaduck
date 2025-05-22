@@ -133,6 +133,7 @@ function showTimeSeries(data) {
     {unit: 'hour', step: 1, ms: 3600000},
     {unit: 'hour', step: 2, ms: 7200000},
     {unit: 'hour', step: 3, ms: 10800000},
+    {unit: 'hour', step: 4, ms: 14400000},
     {unit: 'hour', step: 6, ms: 21600000},
     {unit: 'hour', step: 12, ms: 43200000},
     {unit: 'day', step: 1, ms: 86400000},
@@ -198,6 +199,7 @@ function showTimeSeries(data) {
         t = d.getTime() - adj * 86400000;
         t = Math.ceil(t / step) * step;
       }
+      if (t === start) t += step;
       for (; t <= end; t += step) ticks.push(t);
     }
     return ticks;
