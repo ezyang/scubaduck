@@ -14,7 +14,10 @@ function showTimeSeries(data) {
     return;
   }
   const height = 400;
-  view.innerHTML = '<div id="legend"></div><svg id="chart" height="' + height + '"></svg>';
+  view.innerHTML =
+    '<div id="ts-container"><div id="legend"></div><div id="chart-wrapper"><svg id="chart" height="' +
+    height +
+    '"></svg></div></div>';
   const svg = document.getElementById('chart');
   const legend = document.getElementById('legend');
   const groups = groupBy.chips || [];

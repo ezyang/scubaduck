@@ -1032,14 +1032,24 @@ def test_timeseries_resize(page: Any, server_url: str) -> None:
         )
 
     before = chart_info()
+    legend_width = page.evaluate(
+        "parseFloat(getComputedStyle(document.getElementById('legend')).width)"
+    )
+    assert page.evaluate(
+        "() => document.getElementById('legend').getBoundingClientRect().right <= document.getElementById('chart').getBoundingClientRect().left"
+    )
     page.evaluate("document.getElementById('sidebar').style.width='200px'")
     page.wait_for_function(
         "width => document.getElementById('chart').getAttribute('width') != width",
         arg=before["width"],
     )
     after = chart_info()
+    legend_width_after = page.evaluate(
+        "parseFloat(getComputedStyle(document.getElementById('legend')).width)"
+    )
     assert after["width"] > before["width"]
     assert after["last"] > before["last"]
+    assert legend_width_after == legend_width
 
 
 def test_timeseries_no_overflow(page: Any, server_url: str) -> None:
