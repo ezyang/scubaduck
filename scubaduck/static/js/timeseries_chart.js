@@ -10,16 +10,16 @@ function showTimeSeries(data) {
     view.innerHTML = '<p id="empty-message">Empty data provided to table</p>';
     return;
   }
-  const width = 600;
   const height = 400;
   view.innerHTML =
-    '<div id="legend"></div><svg id="chart" width="' +
-    width +
-    '" height="' +
+    '<div id="ts-container"><div id="legend"></div><div id="chart-wrapper"><svg id="chart" height="' +
     height +
-    '"></svg>';
-  const svg = document.getElementById('chart');
+    '"></svg></div></div>';
   const legend = document.getElementById('legend');
+  const chartWrapper = document.getElementById('chart-wrapper');
+  const width = chartWrapper.clientWidth || 600;
+  const svg = document.getElementById('chart');
+  svg.setAttribute('width', width);
   const groups = groupBy.chips || [];
   const hasHits = document.getElementById('show_hits').checked ? 1 : 0;
   const fill = document.getElementById('fill').value;

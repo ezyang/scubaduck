@@ -277,6 +277,32 @@ def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
     assert "221, 221, 221" in color
 
 
+def test_timeseries_split_layout_resize(page: Any, server_url: str) -> None:
+    page.set_viewport_size({"width": 800, "height": 600})
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart", state="attached")
+    legend_w1 = page.evaluate(
+        "document.querySelector('#legend').getBoundingClientRect().width"
+    )
+    chart_w1 = page.evaluate(
+        "document.querySelector('#chart-wrapper').getBoundingClientRect().width"
+    )
+    page.set_viewport_size({"width": 1000, "height": 600})
+    legend_w2 = page.evaluate(
+        "document.querySelector('#legend').getBoundingClientRect().width"
+    )
+    chart_w2 = page.evaluate(
+        "document.querySelector('#chart-wrapper').getBoundingClientRect().width"
+    )
+    assert legend_w1 == legend_w2
+    assert chart_w2 > chart_w1
+
+
 def test_timeseries_auto_timezone(browser: Any, server_url: str) -> None:
     context = browser.new_context(timezone_id="America/New_York")
     page = context.new_page()

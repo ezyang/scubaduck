@@ -134,8 +134,20 @@
     .col-group-header .links a {
       margin-left: 5px;
     }
+    #ts-container {
+      display: flex;
+      height: 100%;
+    }
     #legend {
-      margin-bottom: 5px;
+      margin-bottom: 0;
+      margin-right: 10px;
+      width: 150px;
+      overflow-y: auto;
+      flex: 0 0 auto;
+    }
+    #chart-wrapper {
+      flex: 1;
+      overflow: auto;
     }
     .legend-item.highlight {
       background: #ddd;
