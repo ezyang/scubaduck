@@ -1223,3 +1223,21 @@ def test_timeseries_legend_values(page: Any, server_url: str) -> None:
     )
     value = page.evaluate("document.querySelector('#legend .legend-value').textContent")
     assert value != ""
+
+
+def test_timeseries_group_links(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-02 03:00:00")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    assert page.text_content("#legend .drill-links h4") == "Group by"
+    page.click("#legend .drill-links a:text('user')")
+    page.wait_for_function("window.lastResults !== undefined")
+    chips = page.evaluate("groupBy.chips")
+    assert chips == ["user"]
+    assert page.text_content("#legend .drill-links h4") == "Drill up"
+    assert page.is_visible("#legend .drill-links a:text('Aggregate')")

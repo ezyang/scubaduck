@@ -422,6 +422,39 @@ function showTimeSeries(data) {
     });
     svg.appendChild(axis);
     svg.appendChild(yAxis);
+
+    const helper = document.createElement('div');
+    helper.className = 'drill-links';
+    const heading = document.createElement('h4');
+    helper.appendChild(heading);
+    if ((groupBy.chips || []).length) {
+      heading.textContent = 'Drill up';
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = 'Aggregate';
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        groupBy.chips = [];
+        groupBy.renderChips();
+        dive();
+      });
+      helper.appendChild(link);
+    } else {
+      heading.textContent = 'Group by';
+      (allColumns || []).forEach(col => {
+        const link = document.createElement('a');
+        link.href = '#';
+        link.textContent = col;
+        link.addEventListener('click', e => {
+          e.preventDefault();
+          groupBy.addChip(col);
+          groupBy.renderChips();
+          dive();
+        });
+        helper.appendChild(link);
+      });
+    }
+    legend.appendChild(helper);
   }
 
   render();
