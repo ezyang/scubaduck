@@ -277,6 +277,22 @@ def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
     assert "221, 221, 221" in color
 
 
+def test_timeseries_auto_timezone(browser: Any, server_url: str) -> None:
+    context = browser.new_context(timezone_id="America/New_York")
+    page = context.new_page()
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    path = page.get_attribute("#chart path", "d")
+    context.close()
+    assert path is not None
+    coords = [float(p.split(" ")[1]) for p in path.replace("M", "L").split("L")[1:]]
+    assert max(coords) > min(coords)
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

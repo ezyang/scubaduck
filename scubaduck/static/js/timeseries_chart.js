@@ -1,4 +1,10 @@
 function showTimeSeries(data) {
+  function parseTs(s) {
+    if (s.match(/GMT/) || s.endsWith('Z') || /\+\d{2}:?\d{2}$/.test(s)) {
+      return new Date(s).getTime();
+    }
+    return new Date(s + 'Z').getTime();
+  }
   const view = document.getElementById('view');
   if (data.rows.length === 0) {
     view.innerHTML = '<p id="empty-message">Empty data provided to table</p>';
@@ -18,11 +24,11 @@ function showTimeSeries(data) {
   const hasHits = document.getElementById('show_hits').checked ? 1 : 0;
   const fill = document.getElementById('fill').value;
   const bucketMs = (data.bucket_size || 3600) * 1000;
-  const start = data.start ? new Date(data.start).getTime() : null;
-  const end = data.end ? new Date(data.end).getTime() : null;
+  const start = data.start ? parseTs(data.start) : null;
+  const end = data.end ? parseTs(data.end) : null;
   const series = {};
   data.rows.forEach(r => {
-    const ts = new Date(r[0]).getTime();
+    const ts = parseTs(r[0]);
     const key = groups.map((_, i) => r[1 + i]).join(':') || 'all';
     const val = Number(r[1 + groups.length + hasHits]);
     if (!series[key]) series[key] = {};
