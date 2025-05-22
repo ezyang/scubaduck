@@ -96,6 +96,15 @@ def test_limit(page: Any, server_url: str) -> None:
     assert len(data["rows"]) == 2
 
 
+def test_time_column_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#time_column option", state="attached")
+    options = page.locator("#time_column option").all_inner_texts()
+    assert "timestamp" in options
+    assert "value" in options
+    assert page.input_value("#time_column") == "timestamp"
+
+
 def test_simple_filter(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
