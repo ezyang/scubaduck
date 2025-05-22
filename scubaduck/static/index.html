@@ -113,6 +113,7 @@
     #filters h4 { margin: 0 0 5px 0; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border: 1px solid #ccc; padding: 4px; box-sizing: border-box; }
+    td.numeric { white-space: nowrap; }
     th { text-align: left; cursor: pointer; position: relative; }
     th.sorted { color: blue; }
     tr:nth-child(even) td { background: #f9f9f9; }
@@ -1224,6 +1225,9 @@ function renderTable(rows) {
         } else {
           td.textContent = isStringColumn(col) ? v : formatNumber(v);
         }
+      }
+      if (!isStringColumn(col) && !isTimeColumn(col)) {
+        td.classList.add('numeric');
       }
       td.style.textAlign = isStringColumn(col) ? 'left' : 'right';
       tr.appendChild(td);
