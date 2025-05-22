@@ -272,7 +272,7 @@ def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
     )
     assert "3" in width
     color = page.evaluate(
-        "getComputedStyle(document.querySelector('#legend div')).backgroundColor"
+        "getComputedStyle(document.querySelector('#legend .legend-item')).backgroundColor"
     )
     assert "221, 221, 221" in color
 
@@ -1103,3 +1103,25 @@ def test_timeseries_axis_ticks(page: Any, server_url: str) -> None:
     page.wait_for_selector("#chart text.tick-label", state="attached")
     count = page.eval_on_selector_all("#chart text.tick-label", "els => els.length")
     assert count > 2
+
+
+def test_timeseries_legend_values(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("g => { groupBy.chips = g; groupBy.renderChips(); }", ["user"])
+    select_value(page, "#aggregate", "Avg")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    headers = page.evaluate(
+        "() => Array.from(document.querySelectorAll('#legend .legend-header')).map(e => e.textContent)"
+    )
+    assert any(h.startswith("alice") for h in headers)
+    page.wait_for_selector("#chart path", state="attached")
+    page.eval_on_selector(
+        "#chart",
+        "el => { const r=el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousemove', {clientX:r.left+r.width/2, clientY:r.top+r.height/2, bubbles:true})); }",
+    )
+    value = page.evaluate("document.querySelector('#legend .legend-value').textContent")
+    assert value != ""
