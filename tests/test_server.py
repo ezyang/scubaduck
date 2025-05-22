@@ -9,6 +9,20 @@ from scubaduck import server
 import pytest
 
 
+def _has_sqlite_extension() -> bool:
+    con = duckdb.connect()
+    try:
+        con.execute("LOAD sqlite")
+    except Exception:
+        return False
+    finally:
+        con.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+    return True
+
+
+SQLITE_AVAILABLE = _has_sqlite_extension()
+
+
 def test_basic_query() -> None:
     app = server.app
     client = app.test_client()
@@ -195,7 +209,10 @@ def test_database_types(tmp_path: Path) -> None:
     )
     con.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
-    for db in (csv_file, sqlite_file, duckdb_file):
+    dbs = [csv_file, duckdb_file]
+    if SQLITE_AVAILABLE:
+        dbs.insert(1, sqlite_file)
+    for db in dbs:
         app = server.create_app(db)
         client = app.test_client()
         payload = _make_payload()
@@ -206,7 +223,8 @@ def test_database_types(tmp_path: Path) -> None:
         assert len(rows) == 3
 
 
-def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.skipif(not SQLITE_AVAILABLE, reason="SQLite extension not available")
+def test_sqlite_longvarchar(tmp_path: Path) -> None:
     sqlite_file = tmp_path / "events.sqlite"
     import sqlite3
 
@@ -219,31 +237,6 @@ def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     )
     conn.commit()
     conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-
-    from typing import Any
-
-    real_connect = duckdb.connect
-
-    def failing_connect(*args: Any, **kwargs: Any) -> Any:
-        real = real_connect(*args, **kwargs)
-
-        class Wrapper:
-            def __init__(self, con: duckdb.DuckDBPyConnection) -> None:
-                self.con = con
-                self._failed = False
-
-            def execute(self, sql: str, *a: Any, **kw: Any):
-                if not self._failed and sql == "LOAD sqlite":
-                    self._failed = True
-                    raise RuntimeError("fail")
-                return self.con.execute(sql, *a, **kw)
-
-            def __getattr__(self, name: str) -> object:
-                return getattr(self.con, name)
-
-        return Wrapper(real)
-
-    monkeypatch.setattr(server.duckdb, "connect", failing_connect)
 
     app = server.create_app(sqlite_file)
     client = app.test_client()
@@ -262,7 +255,8 @@ def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert data["rows"][0][1] == "https://a.com"
 
 
-def test_sqlite_bigint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.skipif(not SQLITE_AVAILABLE, reason="SQLite extension not available")
+def test_sqlite_bigint(tmp_path: Path) -> None:
     sqlite_file = tmp_path / "big.sqlite"
     import sqlite3
 
@@ -275,31 +269,6 @@ def test_sqlite_bigint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     conn.commit()
     conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-
-    from typing import Any
-
-    real_connect = duckdb.connect
-
-    def failing_connect(*args: Any, **kwargs: Any) -> Any:
-        real = real_connect(*args, **kwargs)
-
-        class Wrapper:
-            def __init__(self, con: duckdb.DuckDBPyConnection) -> None:
-                self.con = con
-                self._failed = False
-
-            def execute(self, sql: str, *a: Any, **kw: Any):
-                if not self._failed and sql == "LOAD sqlite":
-                    self._failed = True
-                    raise RuntimeError("fail")
-                return self.con.execute(sql, *a, **kw)
-
-            def __getattr__(self, name: str) -> object:
-                return getattr(self.con, name)
-
-        return Wrapper(real)
-
-    monkeypatch.setattr(server.duckdb, "connect", failing_connect)
 
     app = server.create_app(sqlite_file)
     client = app.test_client()
