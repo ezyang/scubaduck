@@ -386,6 +386,17 @@ limitInput.addEventListener('input', () => {
 });
 
 function initDropdown(select) {
+  // Avoid creating duplicate wrappers if this dropdown was already initialised.
+  if (select.dataset.dropdownInit) {
+    const disp = select.parentElement?.querySelector('.dropdown-display');
+    if (disp) {
+      const opt = select.options[select.selectedIndex];
+      disp.textContent = opt ? opt.textContent : '';
+    }
+    return;
+  }
+  select.dataset.dropdownInit = '1';
+
   const wrapper = document.createElement('div');
   wrapper.className = 'dropdown';
   if (select.classList.contains('f-col')) {
