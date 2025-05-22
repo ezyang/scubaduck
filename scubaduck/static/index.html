@@ -817,6 +817,7 @@ function formatNumber(val) {
     }
   }
   if (abs < 0.0005) return '0.000';
+  if (Number.isInteger(val)) return val.toString();
   return val.toFixed(3);
 }
 
