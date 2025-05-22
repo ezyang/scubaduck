@@ -670,6 +670,18 @@ def test_column_group_links_float_right(page: Any, server_url: str) -> None:
     assert float_val == "right"
 
 
+def test_columns_tab_selected_count(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    count_text = page.text_content("#columns_tab")
+    assert count_text is not None and "(4)" in count_text
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    page.uncheck("#column_groups input[value='value']")
+    count_text = page.text_content("#columns_tab")
+    assert count_text is not None and "(3)" in count_text
+
+
 def test_chip_dropdown_navigation(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")

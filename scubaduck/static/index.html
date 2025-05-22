@@ -195,7 +195,7 @@
     <div id="sidebar">
       <div id="tabs">
         <button class="tab active" data-tab="settings">View Settings</button>
-        <button class="tab" data-tab="columns">Columns</button>
+        <button id="columns_tab" class="tab" data-tab="columns">Columns</button>
         <button id="dive" onclick="dive()">Dive</button>
       </div>
       <div id="settings" class="tab-content active">
@@ -764,11 +764,19 @@ document.querySelectorAll('.rel-dropdown div').forEach(opt => {
     opt.parentElement.style.display = 'none';
   });
 });
+
 document.addEventListener('click', e => {
   document.querySelectorAll('.rel-dropdown').forEach(dd => {
     if (!dd.parentElement.contains(e.target)) dd.style.display = 'none';
   });
 });
+
+function updateColumnsTabCount() {
+  const baseCount = document.querySelectorAll('#column_groups input:checked').length;
+  const derivedCount = document.querySelectorAll('#derived_list .derived .d-use:checked').length;
+  const btn = document.getElementById('columns_tab');
+  if (btn) btn.textContent = `Columns (${baseCount + derivedCount})`;
+}
 
 function updateSelectedColumns(type = graphTypeSel.value) {
   const base = allColumns.filter(name => {
@@ -793,6 +801,7 @@ function updateSelectedColumns(type = graphTypeSel.value) {
     });
   }
   columnValues[type] = selectedColumns.slice();
+  updateColumnsTabCount();
 }
 
 function isStringColumn(name) {
