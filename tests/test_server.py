@@ -266,6 +266,37 @@ def test_sqlite_bigint(tmp_path: Path) -> None:
     assert data["rows"][0][1] == big_value
 
 
+def test_sqlite_boolean_aggregation(tmp_path: Path) -> None:
+    sqlite_file = tmp_path / "bool.sqlite"
+    import sqlite3
+
+    conn = sqlite3.connect(sqlite_file)
+    conn.execute("CREATE TABLE events (timestamp TEXT, flag BOOLEAN)")
+    conn.execute("INSERT INTO events VALUES ('2024-01-01 00:00:00', 1)")
+    conn.execute("INSERT INTO events VALUES ('2024-01-01 00:30:00', 0)")
+    conn.commit()
+    conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    app = server.create_app(sqlite_file)
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-02 00:00:00",
+        "graph_type": "table",
+        "aggregate": "Avg",
+        "columns": ["flag"],
+        "show_hits": True,
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["rows"][0][0] == 2
+    assert data["rows"][0][1] == 0.5
+
+
 def test_integer_time_column(tmp_path: Path) -> None:
     csv_file = tmp_path / "events.csv"
     csv_file.write_text("created,event\n1704067200,login\n1704070800,logout\n")
