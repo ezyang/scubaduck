@@ -293,6 +293,29 @@ def test_timeseries_auto_timezone(browser: Any, server_url: str) -> None:
     assert max(coords) > min(coords)
 
 
+def test_timeseries_multi_series(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.click("text=Add Derived")
+    expr = page.query_selector("#derived_list .derived textarea")
+    assert expr
+    name_inp = page.query_selector("#derived_list .derived .d-name")
+    assert name_inp
+    name_inp.fill("value_2")
+    expr.fill("value * 2")
+    page.click("text=View Settings")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-03 00:00:00")
+    select_value(page, "#granularity", "1 hour")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    count = page.eval_on_selector_all("#chart path", "els => els.length")
+    assert count == 2
+
+
 def test_help_and_alignment(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
@@ -1027,3 +1050,16 @@ def test_timeseries_resize(page: Any, server_url: str) -> None:
     assert after["width"] > before["width"]
     assert after["last"] > before["last"]
     assert legend_width_after == legend_width
+
+
+def test_timeseries_no_overflow(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    overflow = page.evaluate(
+        "var v=document.getElementById('view'); v.scrollWidth > v.clientWidth"
+    )
+    assert not overflow
