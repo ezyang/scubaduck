@@ -1063,3 +1063,15 @@ def test_timeseries_no_overflow(page: Any, server_url: str) -> None:
         "var v=document.getElementById('view'); v.scrollWidth > v.clientWidth"
     )
     assert not overflow
+
+
+def test_timeseries_axis_ticks(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart text.tick-label", state="attached")
+    count = page.eval_on_selector_all("#chart text.tick-label", "els => els.length")
+    assert count > 2
