@@ -206,7 +206,7 @@ def test_database_types(tmp_path: Path) -> None:
         assert len(rows) == 3
 
 
-def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sqlite_longvarchar(tmp_path: Path) -> None:
     sqlite_file = tmp_path / "events.sqlite"
     import sqlite3
 
@@ -219,31 +219,6 @@ def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     )
     conn.commit()
     conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-
-    from typing import Any
-
-    real_connect = duckdb.connect
-
-    def failing_connect(*args: Any, **kwargs: Any) -> Any:
-        real = real_connect(*args, **kwargs)
-
-        class Wrapper:
-            def __init__(self, con: duckdb.DuckDBPyConnection) -> None:
-                self.con = con
-                self._failed = False
-
-            def execute(self, sql: str, *a: Any, **kw: Any):
-                if not self._failed and sql == "LOAD sqlite":
-                    self._failed = True
-                    raise RuntimeError("fail")
-                return self.con.execute(sql, *a, **kw)
-
-            def __getattr__(self, name: str) -> object:
-                return getattr(self.con, name)
-
-        return Wrapper(real)
-
-    monkeypatch.setattr(server.duckdb, "connect", failing_connect)
 
     app = server.create_app(sqlite_file)
     client = app.test_client()
@@ -262,7 +237,7 @@ def test_sqlite_longvarchar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert data["rows"][0][1] == "https://a.com"
 
 
-def test_sqlite_bigint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sqlite_bigint(tmp_path: Path) -> None:
     sqlite_file = tmp_path / "big.sqlite"
     import sqlite3
 
@@ -275,31 +250,6 @@ def test_sqlite_bigint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     conn.commit()
     conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-
-    from typing import Any
-
-    real_connect = duckdb.connect
-
-    def failing_connect(*args: Any, **kwargs: Any) -> Any:
-        real = real_connect(*args, **kwargs)
-
-        class Wrapper:
-            def __init__(self, con: duckdb.DuckDBPyConnection) -> None:
-                self.con = con
-                self._failed = False
-
-            def execute(self, sql: str, *a: Any, **kw: Any):
-                if not self._failed and sql == "LOAD sqlite":
-                    self._failed = True
-                    raise RuntimeError("fail")
-                return self.con.execute(sql, *a, **kw)
-
-            def __getattr__(self, name: str) -> object:
-                return getattr(self.con, name)
-
-        return Wrapper(real)
-
-    monkeypatch.setattr(server.duckdb, "connect", failing_connect)
 
     app = server.create_app(sqlite_file)
     client = app.test_client()

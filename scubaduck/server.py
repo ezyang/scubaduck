@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 import time
 from pathlib import Path
 import os
-import sqlite3
 import traceback
 import math
 
@@ -47,28 +46,6 @@ class QueryParams:
     time_unit: str = "s"
 
 
-def _normalize_sqlite_type(sql: str) -> str:
-    """Map arbitrary SQLite column types to DuckDB-compatible types."""
-    t = sql.strip().upper()
-    if "(" in t:
-        t = t.split("(", 1)[0]
-    if "INT" in t:
-        # SQLite only has a single INTEGER type which is always 64-bit.
-        # Use DuckDB's BIGINT to avoid overflow when values exceed INT32.
-        return "BIGINT"
-    if any(key in t for key in ("CHAR", "CLOB", "TEXT")):
-        return "VARCHAR"
-    if "BLOB" in t:
-        return "BLOB"
-    if any(key in t for key in ("DOUBLE", "REAL", "FLOA", "NUMERIC", "DECIMAL")):
-        return "DOUBLE"
-    if "BOOL" in t:
-        return "BOOLEAN"
-    if "DATE" in t or "TIME" in t:
-        return "TIMESTAMP" if "TIME" in t else "DATE"
-    return "VARCHAR"
-
-
 def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
     if not path.exists():
         raise FileNotFoundError(path)
@@ -81,40 +58,16 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
         )
     elif ext in {".db", ".sqlite"}:
         con = duckdb.connect()
-        try:
-            con.execute("LOAD sqlite")
-            con.execute(f"ATTACH '{path.as_posix()}' AS db (TYPE SQLITE)")
-            tables = [
-                r[0]
-                for r in con.execute(
-                    "SELECT name FROM db.sqlite_master WHERE type='table'"
-                ).fetchall()
-            ]
-            for t in tables:
-                con.execute(f'CREATE VIEW "{t}" AS SELECT * FROM db."{t}"')
-        except Exception:
-            sconn = sqlite3.connect(path)
-            tables = [
-                r[0]
-                for r in sconn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            ]
-            for t in tables:
-                info = sconn.execute(f'PRAGMA table_info("{t}")').fetchall()
-                col_defs = ", ".join(
-                    f'"{r[1]}" {_normalize_sqlite_type(cast(str, r[2]))}' for r in info
-                )
-                sql = f'CREATE TABLE "{t}" ({col_defs})'
-                try:
-                    con.execute(sql)
-                except Exception:
-                    print(f"Failed SQL: {sql}")
-                    raise
-                placeholders = ",".join("?" for _ in info)
-                for row in sconn.execute(f'SELECT * FROM "{t}"'):
-                    con.execute(f'INSERT INTO "{t}" VALUES ({placeholders})', row)
-            sconn.close()
+        con.execute("LOAD sqlite")
+        con.execute(f"ATTACH '{path.as_posix()}' AS db (TYPE SQLITE)")
+        tables = [
+            r[0]
+            for r in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        for t in tables:
+            con.execute(f'CREATE VIEW "{t}" AS SELECT * FROM db."{t}"')
     else:
         con = duckdb.connect(path)
     return con
