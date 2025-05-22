@@ -700,22 +700,24 @@ function loadColumns(table) {
 
 let columnsInitialized = false;
 fetch('/api/tables').then(r => r.json()).then(tables => {
+  const tableSel = document.getElementById('table');
   tables.forEach(t => {
     const o = document.createElement('option');
     o.value = t;
     o.textContent = t;
-    document.getElementById('table').appendChild(o);
+    tableSel.appendChild(o);
   });
+  initDropdown(tableSel);
   const table = parseSearch().table || tables[0];
-  document.getElementById('table').value = table;
+  tableSel.value = table;
   loadColumns(table).then(() => {
     updateDisplayTypeUI();
     addFilter();
     initFromUrl();
     columnsInitialized = true;
   });
-  document.getElementById('table').addEventListener('change', () => {
-    loadColumns(document.getElementById('table').value).then(() => {
+  tableSel.addEventListener('change', () => {
+    loadColumns(tableSel.value).then(() => {
       if (columnsInitialized) {
         applyParams(parseSearch());
       }
