@@ -204,19 +204,22 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         agg = (params.aggregate or "avg").lower()
 
         def agg_expr(col: str) -> str:
+            expr = col
+            ctype = column_types.get(col, "").upper() if column_types else ""
+            if "BOOL" in ctype:
+                expr = f"CAST({col} AS BIGINT)"
             if agg.startswith("p"):
                 quant = float(agg[1:]) / 100
-                return f"quantile({col}, {quant})"
+                return f"quantile({expr}, {quant})"
             if agg == "count distinct":
-                return f"count(DISTINCT {col})"
+                return f"count(DISTINCT {expr})"
             if agg == "avg" and column_types is not None:
-                ctype = column_types.get(col, "").upper()
                 if "TIMESTAMP" in ctype or "DATE" in ctype or "TIME" in ctype:
                     return (
                         "TIMESTAMP 'epoch' + INTERVAL '1 second' * "
                         f"CAST(avg(epoch({col})) AS BIGINT)"
                     )
-            return f"{agg}({col})"
+            return f"{agg}({expr})"
 
         for col in params.columns:
             if col in group_cols:
