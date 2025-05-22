@@ -205,7 +205,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             group_cols[1:] if params.graph_type == "timeseries" else group_cols
         )
         select_parts.extend(select_cols)
-        agg = (params.aggregate or "avg").lower()
+        agg = (params.aggregate or "count").lower()
 
         def agg_expr(col: str) -> str:
             expr = col
@@ -225,10 +225,13 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
                     )
             return f"{agg}({expr})"
 
-        for col in params.columns:
-            if col in group_cols:
-                continue
-            select_parts.append(f"{agg_expr(col)} AS {col}")
+        if agg == "count":
+            select_parts.append("count(*) AS Count")
+        else:
+            for col in params.columns:
+                if col in group_cols:
+                    continue
+                select_parts.append(f"{agg_expr(col)} AS {col}")
         if params.show_hits:
             select_parts.insert(len(group_cols), "count(*) AS Hits")
     else:
@@ -483,7 +486,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             return jsonify({"error": f"Unknown column: {params.order_by}"}), 400
 
         if params.group_by or params.graph_type == "timeseries":
-            agg = (params.aggregate or "avg").lower()
+            agg = (params.aggregate or "count").lower()
             if agg.startswith("p") or agg == "sum":
                 need_numeric = True
                 allow_time = False

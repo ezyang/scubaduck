@@ -57,7 +57,7 @@ def test_range_filters(page: Any, server_url: str) -> None:
         server_url,
         start="2024-01-02 00:00:00",
         end="2024-01-02 04:00:00",
-        order_by="timestamp",
+        order_by="user",
         limit=100,
     )
     assert len(data["rows"]) == 2
@@ -90,7 +90,7 @@ def test_limit(page: Any, server_url: str) -> None:
         server_url,
         start="2024-01-01 00:00:00",
         end="2024-01-03 00:00:00",
-        order_by="timestamp",
+        order_by="user",
         limit=2,
     )
     assert len(data["rows"]) == 2
@@ -419,6 +419,7 @@ def test_timeseries_multi_series(page: Any, server_url: str) -> None:
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-03 00:00:00")
     select_value(page, "#granularity", "1 hour")
+    select_value(page, "#aggregate", "Avg")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -446,7 +447,7 @@ def test_table_sorting(page: Any, server_url: str) -> None:
         server_url,
         start="2024-01-01 00:00:00",
         end="2024-01-03 00:00:00",
-        order_by="timestamp",
+        order_by="user",
         order_dir="ASC",
         limit=100,
     )
@@ -512,7 +513,7 @@ def test_invalid_time_error_shown(page: Any, server_url: str) -> None:
         server_url,
         start="nonsense",
         end="now",
-        order_by="timestamp",
+        order_by="user",
     )
     assert "error" in data
     msg = page.text_content("#view")
@@ -1036,7 +1037,7 @@ def test_table_group_by_query(page: Any, server_url: str) -> None:
         server_url,
         start="2024-01-01 00:00:00",
         end="2024-01-03 00:00:00",
-        order_by="timestamp",
+        order_by="user",
         limit=100,
         group_by=["user"],
         aggregate="Count",
