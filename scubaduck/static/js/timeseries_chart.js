@@ -1,3 +1,6 @@
+let resizeObserver = null;
+let currentChart = null;
+
 function showTimeSeries(data) {
   function parseTs(s) {
     if (s.match(/GMT/) || s.endsWith('Z') || /\+\d{2}:?\d{2}$/.test(s)) {
@@ -10,14 +13,8 @@ function showTimeSeries(data) {
     view.innerHTML = '<p id="empty-message">Empty data provided to table</p>';
     return;
   }
-  const width = 600;
   const height = 400;
-  view.innerHTML =
-    '<div id="legend"></div><svg id="chart" width="' +
-    width +
-    '" height="' +
-    height +
-    '"></svg>';
+  view.innerHTML = '<div id="legend"></div><svg id="chart" height="' + height + '"></svg>';
   const svg = document.getElementById('chart');
   const legend = document.getElementById('legend');
   const groups = groupBy.chips || [];
@@ -82,56 +79,82 @@ function showTimeSeries(data) {
     '#8c564b',
     '#e377c2'
   ];
-  let colorIndex = 0;
-  const xRange = maxX - minX || 1;
-  const yRange = maxY - minY || 1;
-  const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
-  const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
 
-  Object.keys(series).forEach(key => {
-    const vals = series[key];
-    const color = colors[colorIndex++ % colors.length];
-    let path = '';
-    let drawing = false;
-    buckets.forEach(b => {
-      const v = vals[b];
-      if (v === undefined) {
-        if (fill === '0') {
+  currentChart = {
+    svg,
+    legend,
+    series,
+    buckets,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    fill,
+    colors,
+    height
+  };
+
+  function render() {
+    const width = svg.parentElement.clientWidth;
+    svg.setAttribute('width', width);
+    svg.innerHTML = '';
+    legend.innerHTML = '';
+    let colorIndex = 0;
+    const xRange = maxX - minX || 1;
+    const yRange = maxY - minY || 1;
+    const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
+    const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
+    Object.keys(series).forEach(key => {
+      const vals = series[key];
+      const color = colors[colorIndex++ % colors.length];
+      let path = '';
+      let drawing = false;
+      buckets.forEach(b => {
+        const v = vals[b];
+        if (v === undefined) {
+          if (fill === '0') {
+            const x = xScale(b);
+            const y = yScale(0);
+            path += (drawing ? 'L' : 'M') + x + ' ' + y + ' ';
+            drawing = true;
+          } else if (fill === 'blank') {
+            drawing = false;
+          }
+          // connect: do nothing
+        } else {
           const x = xScale(b);
-          const y = yScale(0);
+          const y = yScale(v);
           path += (drawing ? 'L' : 'M') + x + ' ' + y + ' ';
           drawing = true;
-        } else if (fill === 'blank') {
-          drawing = false;
         }
-        // connect: do nothing
-      } else {
-        const x = xScale(b);
-        const y = yScale(v);
-        path += (drawing ? 'L' : 'M') + x + ' ' + y + ' ';
-        drawing = true;
+      });
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      el.setAttribute('d', path.trim());
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', color);
+      el.setAttribute('stroke-width', '1');
+      svg.appendChild(el);
+      const item = document.createElement('div');
+      item.textContent = key;
+      item.style.color = color;
+      item.className = 'legend-item';
+      legend.appendChild(item);
+
+      function highlight(on) {
+        el.setAttribute('stroke-width', on ? '3' : '1');
+        item.classList.toggle('highlight', on);
       }
+
+      el.addEventListener('mouseenter', () => highlight(true));
+      el.addEventListener('mouseleave', () => highlight(false));
+      item.addEventListener('mouseenter', () => highlight(true));
+      item.addEventListener('mouseleave', () => highlight(false));
     });
-    const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    el.setAttribute('d', path.trim());
-    el.setAttribute('fill', 'none');
-    el.setAttribute('stroke', color);
-    el.setAttribute('stroke-width', '1');
-    svg.appendChild(el);
-    const item = document.createElement('div');
-    item.textContent = key;
-    item.style.color = color;
-    item.className = 'legend-item';
-    legend.appendChild(item);
+  }
 
-    function highlight(on) {
-      el.setAttribute('stroke-width', on ? '3' : '1');
-      item.classList.toggle('highlight', on);
-    }
+  render();
 
-    el.addEventListener('mouseenter', () => highlight(true));
-    el.addEventListener('mouseleave', () => highlight(false));
-    item.addEventListener('mouseenter', () => highlight(true));
-    item.addEventListener('mouseleave', () => highlight(false));
-  });
+  if (resizeObserver) resizeObserver.disconnect();
+  resizeObserver = new ResizeObserver(render);
+  resizeObserver.observe(svg.parentElement);
 }
