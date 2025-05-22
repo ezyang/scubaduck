@@ -531,6 +531,10 @@ function loadColumns(table) {
     const timeColumnSelect = document.getElementById('time_column');
     orderSelect.innerHTML = '';
     xAxisSelect.innerHTML = '';
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = '(default)';
+    xAxisSelect.appendChild(defOpt);
     timeColumnSelect.innerHTML = '';
     groupsEl.innerHTML = '';
     allColumns.length = 0;
@@ -598,6 +602,7 @@ function loadColumns(table) {
       o.textContent = name;
       timeColumnSelect.appendChild(o);
     });
+    xAxisSelect.value = '';
     defaultTimeColumn = guess || timeColumnOptions[0] || '';
     Object.keys(groups).forEach(key => {
       const g = groups[key];
@@ -1002,7 +1007,8 @@ function collectParams() {
     payload.show_hits = document.getElementById('show_hits').checked;
   }
   if (graphTypeSel.value === 'timeseries') {
-    payload.x_axis = document.getElementById('x_axis').value;
+    const xval = document.getElementById('x_axis').value;
+    if (xval) payload.x_axis = xval;
     payload.granularity = document.getElementById('granularity').value;
     payload.fill = document.getElementById('fill').value;
   }
@@ -1053,7 +1059,11 @@ function applyParams(params) {
   }
   graphTypeSel.value = params.graph_type || 'samples';
   updateDisplayTypeUI();
-  if (params.x_axis) document.getElementById('x_axis').value = params.x_axis;
+  if (params.x_axis) {
+    document.getElementById('x_axis').value = params.x_axis;
+  } else {
+    document.getElementById('x_axis').value = '';
+  }
   if (params.granularity) document.getElementById('granularity').value = params.granularity;
   if (params.fill) document.getElementById('fill').value = params.fill;
   if (params.group_by) {

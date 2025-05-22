@@ -113,6 +113,16 @@ def test_time_unit_dropdown(page: Any, server_url: str) -> None:
     assert page.input_value("#time_unit") == "s"
 
 
+def test_x_axis_default_entry(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.wait_for_selector("#x_axis option", state="attached")
+    options = page.locator("#x_axis option").all_inner_texts()
+    assert "(default)" in options
+    assert page.input_value("#x_axis") == ""
+
+
 def test_simple_filter(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
