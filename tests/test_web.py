@@ -1105,6 +1105,19 @@ def test_timeseries_axis_ticks(page: Any, server_url: str) -> None:
     assert count > 2
 
 
+def test_timeseries_y_axis_labels(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart text.y-tick-label", state="attached")
+    count = page.eval_on_selector_all("#chart text.y-tick-label", "els => els.length")
+    grid_count = page.eval_on_selector_all("#chart line.grid", "els => els.length")
+    assert count > 0 and count == grid_count
+
+
 def test_timeseries_interval_offset(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
