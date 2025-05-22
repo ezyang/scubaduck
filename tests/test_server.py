@@ -788,3 +788,20 @@ def test_default_start_end_returned() -> None:
     assert rv.status_code == 200
     assert data["start"] == "2024-01-01 00:00:00"
     assert data["end"] == "2024-01-02 03:00:00"
+
+
+def test_time_column_none_no_time_filter() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "columns": ["timestamp", "event"],
+        "time_column": "",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert "start" not in data and "end" not in data
+    assert len(data["rows"]) == 4

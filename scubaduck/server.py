@@ -42,7 +42,7 @@ class QueryParams:
     granularity: str = "Auto"
     fill: str = "0"
     table: str = "events"
-    time_column: str = "timestamp"
+    time_column: str | None = "timestamp"
     time_unit: str = "s"
 
 
@@ -186,6 +186,8 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     if params.graph_type == "timeseries":
         sec = _granularity_seconds(params.granularity, params.start, params.end)
         x_axis = params.x_axis or params.time_column
+        if x_axis is None:
+            raise ValueError("x_axis required for timeseries")
         xexpr = _time_expr(x_axis, column_types, params.time_unit)
         if params.start:
             bucket_expr = (
@@ -265,10 +267,13 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     select_clause = ", ".join(select_parts) if select_parts else "*"
     lines = [f"SELECT {select_clause}", f'FROM "{params.table}"']
     where_parts: list[str] = []
-    time_expr = _time_expr(params.time_column, column_types, params.time_unit)
-    if params.start:
+    if params.time_column:
+        time_expr = _time_expr(params.time_column, column_types, params.time_unit)
+    else:
+        time_expr = None
+    if time_expr and params.start:
         where_parts.append(f"{time_expr} >= '{params.start}'")
-    if params.end:
+    if time_expr and params.end:
         where_parts.append(f"{time_expr} <= '{params.end}'")
     for f in params.filters:
         op = f.op
@@ -432,7 +437,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
         column_types = get_columns(params.table)
 
-        if params.time_column not in column_types:
+        if params.time_column and params.time_column not in column_types:
             return jsonify({"error": "Invalid time_column"}), 400
 
         if params.time_unit not in {"s", "ms", "us", "ns"}:
@@ -455,7 +460,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         if params.graph_type == "timeseries":
             if params.x_axis is None:
                 params.x_axis = params.time_column
-            if params.x_axis not in valid_cols:
+            if params.x_axis is None or params.x_axis not in valid_cols:
                 return jsonify({"error": "Invalid x_axis"}), 400
             ctype = column_types.get(params.x_axis, "").upper()
             is_time = any(t in ctype for t in ["TIMESTAMP", "DATE", "TIME"])
@@ -531,7 +536,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                             ),
                             400,
                         )
-        if params.start is None or params.end is None:
+        if (params.start is None or params.end is None) and (
+            params.x_axis or params.time_column
+        ):
             axis = params.x_axis or params.time_column
             row = cast(
                 tuple[datetime | None, datetime | None],

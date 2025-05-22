@@ -112,9 +112,24 @@ def test_time_column_dropdown(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#time_column option", state="attached")
     options = page.locator("#time_column option").all_inner_texts()
+    assert "(none)" in options
     assert "timestamp" in options
     assert "value" in options
     assert page.input_value("#time_column") == "timestamp"
+
+
+def test_time_column_none_hides_range(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#time_column option", state="attached")
+    select_value(page, "#time_column", "")
+    assert page.is_hidden("#start")
+    assert page.is_hidden("#end")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    data = page.evaluate("window.lastResults")
+    assert len(data["rows"]) == 4
+    assert "start" not in data and "end" not in data
 
 
 def test_time_unit_dropdown(page: Any, server_url: str) -> None:
