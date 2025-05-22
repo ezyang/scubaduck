@@ -95,7 +95,11 @@ function showTimeSeries(data) {
   };
 
   function render() {
-    const width = svg.parentElement.clientWidth;
+    const style = getComputedStyle(svg.parentElement);
+    const width =
+      svg.parentElement.clientWidth -
+      parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight);
     svg.setAttribute('width', width);
     svg.innerHTML = '';
     legend.innerHTML = '';

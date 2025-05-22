@@ -1017,3 +1017,16 @@ def test_timeseries_resize(page: Any, server_url: str) -> None:
     after = chart_info()
     assert after["width"] > before["width"]
     assert after["last"] > before["last"]
+
+
+def test_timeseries_no_overflow(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    overflow = page.evaluate(
+        "var v=document.getElementById('view'); v.scrollWidth > v.clientWidth"
+    )
+    assert not overflow
