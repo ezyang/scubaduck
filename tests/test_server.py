@@ -337,6 +337,28 @@ def test_integer_time_column(tmp_path: Path) -> None:
     assert len(data["rows"]) == 2
 
 
+def test_integer_time_unit_ms(tmp_path: Path) -> None:
+    csv_file = tmp_path / "events.csv"
+    csv_file.write_text("created,event\n1704067200000,login\n1704070800000,logout\n")
+    app = server.create_app(csv_file)
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-01 01:00:00",
+        "order_by": "created",
+        "columns": ["created", "event"],
+        "time_column": "created",
+        "time_unit": "ms",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 2
+
+
 def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     csv_file = tmp_path / "custom.csv"
     csv_file.write_text("timestamp,event,value,user\n2024-01-01 00:00:00,login,5,bob\n")

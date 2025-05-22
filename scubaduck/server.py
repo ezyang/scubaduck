@@ -44,6 +44,7 @@ class QueryParams:
     fill: str = "0"
     table: str = "events"
     time_column: str = "timestamp"
+    time_unit: str = "s"
 
 
 def _normalize_sqlite_type(sql: str) -> str:
@@ -190,7 +191,7 @@ def _granularity_seconds(granularity: str, start: str | None, end: str | None) -
     return 3600
 
 
-def _time_expr(col: str, column_types: Dict[str, str] | None) -> str:
+def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
     """Return SQL expression for column interpreted as timestamp."""
     if column_types is None:
         return col
@@ -208,7 +209,17 @@ def _time_expr(col: str, column_types: Dict[str, str] | None) -> str:
                 "HUGEINT",
             ]
         ):
-            return f"TIMESTAMP 'epoch' + INTERVAL '1 second' * {col}"
+            divisor = {
+                "s": 1,
+                "ms": 1000,
+                "us": 1_000_000,
+                "ns": 1_000_000_000,
+            }.get(unit, 1)
+            if divisor == 1:
+                expr = f"CAST({col} AS BIGINT)"
+            else:
+                expr = f"CAST({col} / {divisor} AS BIGINT)"
+            return f"TIMESTAMP 'epoch' + INTERVAL '1 second' * {expr}"
     return col
 
 
@@ -218,7 +229,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     if params.graph_type == "timeseries":
         sec = _granularity_seconds(params.granularity, params.start, params.end)
         x_axis = params.x_axis or params.time_column
-        xexpr = _time_expr(x_axis, column_types)
+        xexpr = _time_expr(x_axis, column_types, params.time_unit)
         if params.start:
             bucket_expr = (
                 f"TIMESTAMP '{params.start}' + INTERVAL '{sec} second' * "
@@ -294,7 +305,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
     select_clause = ", ".join(select_parts) if select_parts else "*"
     lines = [f"SELECT {select_clause}", f'FROM "{params.table}"']
     where_parts: list[str] = []
-    time_expr = _time_expr(params.time_column, column_types)
+    time_expr = _time_expr(params.time_column, column_types, params.time_unit)
     if params.start:
         where_parts.append(f"{time_expr} >= '{params.start}'")
     if params.end:
@@ -451,6 +462,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             fill=payload.get("fill", "0"),
             table=payload.get("table", default_table),
             time_column=payload.get("time_column", "timestamp"),
+            time_unit=payload.get("time_unit", "s"),
         )
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
@@ -462,6 +474,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
         if params.time_column not in column_types:
             return jsonify({"error": "Invalid time_column"}), 400
+
+        if params.time_unit not in {"s", "ms", "us", "ns"}:
+            return jsonify({"error": "Invalid time_unit"}), 400
 
         if params.graph_type not in {"table", "timeseries"} and (
             params.group_by or params.aggregate or params.show_hits
