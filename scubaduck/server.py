@@ -250,19 +250,25 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         outer_select = ["t.*"] + [
             f"{expr} AS {name}" for name, expr in params.derived_columns.items()
         ]
-        query = f"SELECT {', '.join(outer_select)} FROM ({inner_sql}) t"
+        indented_inner = "\n".join("    " + line for line in inner_sql.splitlines())
+        lines = [
+            f"SELECT {', '.join(outer_select)}",
+            "FROM (",
+            indented_inner,
+            ") t",
+        ]
         if params.order_by:
-            query += f" ORDER BY {params.order_by} {params.order_dir}"
+            lines.append(f"ORDER BY {params.order_by} {params.order_dir}")
         elif params.graph_type == "timeseries":
-            query += " ORDER BY bucket"
+            lines.append("ORDER BY bucket")
         if params.limit is not None:
-            query += f" LIMIT {params.limit}"
-        return query
+            lines.append(f"LIMIT {params.limit}")
+        return "\n".join(lines)
 
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
     select_clause = ", ".join(select_parts) if select_parts else "*"
-    query = f'SELECT {select_clause} FROM "{params.table}"'
+    lines = [f"SELECT {select_clause}", f'FROM "{params.table}"']
     where_parts: list[str] = []
     if params.start:
         where_parts.append(f"timestamp >= '{params.start}'")
@@ -295,16 +301,16 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         else:
             where_parts.append(f"{f.column} {op} {val}")
     if where_parts:
-        query += " WHERE " + " AND ".join(where_parts)
+        lines.append("WHERE " + " AND ".join(where_parts))
     if group_cols:
-        query += " GROUP BY " + ", ".join(group_cols)
+        lines.append("GROUP BY " + ", ".join(group_cols))
     if params.order_by:
-        query += f" ORDER BY {params.order_by} {params.order_dir}"
+        lines.append(f"ORDER BY {params.order_by} {params.order_dir}")
     elif params.graph_type == "timeseries":
-        query += " ORDER BY bucket"
+        lines.append("ORDER BY bucket")
     if params.limit is not None:
-        query += f" LIMIT {params.limit}"
-    return query
+        lines.append(f"LIMIT {params.limit}")
+    return "\n".join(lines)
 
 
 def create_app(db_file: str | Path | None = None) -> Flask:
