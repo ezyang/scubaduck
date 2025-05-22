@@ -580,10 +580,42 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 ).fetchall()[0],
             )
             mn, mx = row
+            divisor = {
+                "s": 1,
+                "ms": 1000,
+                "us": 1_000_000,
+                "ns": 1_000_000_000,
+            }.get(params.time_unit, 1)
             if isinstance(mn, (int, float)):
-                mn = datetime.fromtimestamp(int(mn), tz=timezone.utc)
+                try:
+                    mn = datetime.fromtimestamp(int(mn) / divisor, tz=timezone.utc)
+                except Exception:
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    f"Invalid time value {mn} for column {axis}"
+                                    f" with time_unit {params.time_unit}"
+                                )
+                            }
+                        ),
+                        400,
+                    )
             if isinstance(mx, (int, float)):
-                mx = datetime.fromtimestamp(int(mx), tz=timezone.utc)
+                try:
+                    mx = datetime.fromtimestamp(int(mx) / divisor, tz=timezone.utc)
+                except Exception:
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    f"Invalid time value {mx} for column {axis}"
+                                    f" with time_unit {params.time_unit}"
+                                )
+                            }
+                        ),
+                        400,
+                    )
             if params.start is None and mn is not None:
                 params.start = (
                     mn.strftime("%Y-%m-%d %H:%M:%S") if not isinstance(mn, str) else mn
