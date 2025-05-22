@@ -20,6 +20,14 @@ function showTimeSeries(data) {
     '"></svg></div></div>';
   const svg = document.getElementById('chart');
   const legend = document.getElementById('legend');
+  const crosshairLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  crosshairLine.id = 'crosshair_line';
+  crosshairLine.setAttribute('stroke', '#555');
+  crosshairLine.style.display = 'none';
+
+  const crosshairDots = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  crosshairDots.id = 'crosshair_dots';
+  crosshairDots.style.display = 'none';
   const groups = groupBy.chips || [];
   const hasHits = document.getElementById('show_hits').checked ? 1 : 0;
   const fill = document.getElementById('fill').value;
@@ -99,7 +107,14 @@ function showTimeSeries(data) {
     maxY,
     fill,
     colors,
-    height
+    height,
+    crosshairLine,
+    crosshairDots,
+    seriesEls: {},
+    bucketPixels: [],
+    xScale: null,
+    yScale: null,
+    selected: null
   };
 
   function render() {
@@ -116,6 +131,7 @@ function showTimeSeries(data) {
     const yRange = maxY - minY || 1;
     const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
     const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
+    const seriesEls = {};
     Object.keys(series).forEach(key => {
       const vals = series[key];
       const color = colors[colorIndex++ % colors.length];
@@ -161,10 +177,85 @@ function showTimeSeries(data) {
       el.addEventListener('mouseleave', () => highlight(false));
       item.addEventListener('mouseenter', () => highlight(true));
       item.addEventListener('mouseleave', () => highlight(false));
+      seriesEls[key] = { path: el, item, highlight, color };
     });
+    currentChart.seriesEls = seriesEls;
+    currentChart.xScale = xScale;
+    currentChart.yScale = yScale;
+    currentChart.bucketPixels = buckets.map(xScale);
+    svg.appendChild(crosshairLine);
+    svg.appendChild(crosshairDots);
   }
 
   render();
+
+  function hideCrosshair() {
+    crosshairLine.style.display = 'none';
+    crosshairDots.style.display = 'none';
+    crosshairDots.innerHTML = '';
+    if (currentChart.selected) {
+      currentChart.seriesEls[currentChart.selected].highlight(false);
+      currentChart.selected = null;
+    }
+  }
+
+  svg.addEventListener('mouseleave', hideCrosshair);
+  svg.addEventListener('mousemove', e => {
+    const rect = svg.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const pixels = currentChart.bucketPixels;
+    if (!pixels.length) return;
+    let idx = 0;
+    let dist = Math.abs(pixels[0] - x);
+    for (let i = 1; i < pixels.length; i++) {
+      const d = Math.abs(pixels[i] - x);
+      if (d < dist) {
+        dist = d;
+        idx = i;
+      }
+    }
+    const bucket = currentChart.buckets[idx];
+    const xPix = pixels[idx];
+    crosshairLine.setAttribute('x1', xPix);
+    crosshairLine.setAttribute('x2', xPix);
+    crosshairLine.setAttribute('y1', currentChart.yScale(currentChart.maxY));
+    crosshairLine.setAttribute('y2', currentChart.yScale(currentChart.minY));
+    crosshairLine.style.display = 'block';
+    crosshairDots.style.display = 'block';
+    crosshairDots.innerHTML = '';
+    const options = [];
+    Object.keys(currentChart.series).forEach(key => {
+      const vals = currentChart.series[key];
+      let v = vals[bucket];
+      if (v === undefined && currentChart.fill !== '0') return;
+      if (v === undefined) v = 0;
+      const yPix = currentChart.yScale(v);
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', xPix);
+      dot.setAttribute('cy', yPix);
+      dot.setAttribute('r', '3');
+      dot.setAttribute('fill', currentChart.seriesEls[key].color);
+      crosshairDots.appendChild(dot);
+      options.push({ key, y: yPix });
+    });
+    if (options.length) {
+      let best = options[0];
+      let bestDist = Math.abs(best.y - y);
+      for (let i = 1; i < options.length; i++) {
+        const d = Math.abs(options[i].y - y);
+        if (d < bestDist) {
+          best = options[i];
+          bestDist = d;
+        }
+      }
+      if (currentChart.selected && currentChart.selected !== best.key) {
+        currentChart.seriesEls[currentChart.selected].highlight(false);
+      }
+      currentChart.seriesEls[best.key].highlight(true);
+      currentChart.selected = best.key;
+    }
+  });
 
   if (resizeObserver) resizeObserver.disconnect();
   resizeObserver = new ResizeObserver(render);
