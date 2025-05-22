@@ -305,6 +305,51 @@ def test_timeseries_crosshair(page: Any, server_url: str) -> None:
     assert line_display == "none"
 
 
+def test_timeseries_crosshair_freeze(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart path", state="attached")
+    page.eval_on_selector(
+        "#chart",
+        "el => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousemove', {clientX: r.left + r.width/2, clientY: r.top + r.height/2, bubbles: true})); }",
+    )
+    page.eval_on_selector(
+        "#chart",
+        "el => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('click', {clientX: r.left + r.width/2, clientY: r.top + r.height/2, bubbles: true})); }",
+    )
+    line_display = page.evaluate(
+        "document.getElementById('crosshair_line').style.display"
+    )
+    assert line_display != "none"
+    pos1 = page.evaluate("document.getElementById('crosshair_line').getAttribute('x1')")
+    page.eval_on_selector(
+        "#chart",
+        "el => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousemove', {clientX: r.left + r.width/4, clientY: r.top + r.height/2, bubbles: true})); }",
+    )
+    pos2 = page.evaluate("document.getElementById('crosshair_line').getAttribute('x1')")
+    assert pos1 == pos2
+    page.eval_on_selector(
+        "#chart",
+        "el => el.dispatchEvent(new MouseEvent('mouseleave', {bubbles: true}))",
+    )
+    line_display = page.evaluate(
+        "document.getElementById('crosshair_line').style.display"
+    )
+    assert line_display != "none"
+    page.eval_on_selector(
+        "#chart",
+        "el => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('click', {clientX: r.left + r.width/2, clientY: r.top + r.height/2, bubbles: true})); }",
+    )
+    line_display = page.evaluate(
+        "document.getElementById('crosshair_line').style.display"
+    )
+    assert line_display == "none"
+
+
 def test_timeseries_auto_timezone(browser: Any, server_url: str) -> None:
     context = browser.new_context(timezone_id="America/New_York")
     page = context.new_page()
