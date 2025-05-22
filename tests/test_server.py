@@ -333,6 +333,36 @@ def test_integer_time_unit_us_default_start_end(tmp_path: Path) -> None:
     assert len(data["rows"]) == 2
 
 
+def test_sqlite_integer_time_unit_us(tmp_path: Path) -> None:
+    sqlite_file = tmp_path / "events.sqlite"
+    import sqlite3
+
+    conn = sqlite3.connect(sqlite_file)
+    conn.execute("CREATE TABLE visits (visit_time INTEGER, event TEXT)")
+    big_ts = 13384551652000000
+    conn.execute("INSERT INTO visits VALUES (?, ?)", (big_ts, "foo"))
+    conn.commit()
+    conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    app = server.create_app(sqlite_file)
+    client = app.test_client()
+    payload = {
+        "table": "visits",
+        "start": "2394-02-20 00:00:00",
+        "end": "2394-02-21 00:00:00",
+        "order_by": "visit_time",
+        "columns": ["visit_time", "event"],
+        "time_column": "visit_time",
+        "time_unit": "us",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 1
+
+
 def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     csv_file = tmp_path / "custom.csv"
     csv_file.write_text("timestamp,event,value,user\n2024-01-01 00:00:00,login,5,bob\n")

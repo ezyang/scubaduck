@@ -162,17 +162,21 @@ def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
                 "HUGEINT",
             ]
         ):
-            divisor = {
-                "s": 1,
-                "ms": 1000,
-                "us": 1_000_000,
-                "ns": 1_000_000_000,
-            }.get(unit, 1)
-            if divisor == 1:
+            if unit == "ns":
                 expr = f"CAST({col} AS BIGINT)"
-            else:
-                expr = f"CAST({col} / {divisor} AS BIGINT)"
-            return f"TIMESTAMP 'epoch' + INTERVAL '1 second' * {expr}"
+                return f"make_timestamp_ns({expr})"
+
+            multiplier = {
+                "s": 1_000_000,
+                "ms": 1_000,
+                "us": 1,
+            }.get(unit, 1_000_000)
+            expr = (
+                f"CAST({col} * {multiplier} AS BIGINT)"
+                if multiplier != 1
+                else f"CAST({col} AS BIGINT)"
+            )
+            return f"make_timestamp({expr})"
     return col
 
 
