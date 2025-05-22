@@ -102,6 +102,123 @@ function showTimeSeries(data) {
     height
   };
 
+  const intervals = [
+    {unit: 'second', step: 1, ms: 1000},
+    {unit: 'second', step: 2, ms: 2000},
+    {unit: 'second', step: 5, ms: 5000},
+    {unit: 'second', step: 10, ms: 10000},
+    {unit: 'second', step: 15, ms: 15000},
+    {unit: 'second', step: 30, ms: 30000},
+    {unit: 'minute', step: 1, ms: 60000},
+    {unit: 'minute', step: 2, ms: 120000},
+    {unit: 'minute', step: 5, ms: 300000},
+    {unit: 'minute', step: 10, ms: 600000},
+    {unit: 'minute', step: 15, ms: 900000},
+    {unit: 'minute', step: 30, ms: 1800000},
+    {unit: 'hour', step: 1, ms: 3600000},
+    {unit: 'hour', step: 2, ms: 7200000},
+    {unit: 'hour', step: 3, ms: 10800000},
+    {unit: 'hour', step: 6, ms: 21600000},
+    {unit: 'hour', step: 12, ms: 43200000},
+    {unit: 'day', step: 1, ms: 86400000},
+    {unit: 'day', step: 2, ms: 172800000},
+    {unit: 'week', step: 1, ms: 604800000},
+    {unit: 'week', step: 2, ms: 1209600000},
+    {unit: 'month', step: 1},
+    {unit: 'month', step: 3},
+    {unit: 'month', step: 6},
+    {unit: 'year', step: 1},
+    {unit: 'year', step: 2},
+    {unit: 'year', step: 5},
+    {unit: 'year', step: 10}
+  ];
+
+  function chooseInterval(start, end) {
+    const span = end - start;
+    function approxMs(i) {
+      if (i.ms) return i.ms;
+      if (i.unit === 'month') return i.step * 2629800000;
+      if (i.unit === 'year') return i.step * 31557600000;
+      return 1000;
+    }
+    let best = intervals[0];
+    let bestScore = Infinity;
+    intervals.forEach(i => {
+      const count = span / approxMs(i);
+      const score = Math.abs(count - 15);
+      if (score < bestScore) {
+        best = i;
+        bestScore = score;
+      }
+    });
+    return best;
+  }
+
+  function generateTicks(start, end, intv) {
+    const ticks = [];
+    if (intv.unit === 'month' || intv.unit === 'year') {
+      let d = new Date(start);
+      d.setUTCDate(1);
+      if (intv.unit === 'year') d.setUTCMonth(0);
+      let unitVal =
+        intv.unit === 'month'
+          ? d.getUTCFullYear() * 12 + d.getUTCMonth()
+          : d.getUTCFullYear();
+      unitVal = Math.ceil(unitVal / intv.step) * intv.step;
+      while (true) {
+        const year =
+          intv.unit === 'month' ? Math.floor(unitVal / 12) : unitVal;
+        const month = intv.unit === 'month' ? unitVal % 12 : 0;
+        const t = Date.UTC(year, month, 1);
+        if (t > end) break;
+        if (t >= start) ticks.push(t);
+        unitVal += intv.step;
+      }
+    } else {
+      const step = intv.ms * intv.step;
+      let t = Math.ceil(start / step) * step;
+      if (intv.unit === 'week') {
+        const d = new Date(t);
+        const adj = (d.getUTCDay() + 6) % 7;
+        t = d.getTime() - adj * 86400000;
+        t = Math.ceil(t / step) * step;
+      }
+      for (; t <= end; t += step) ticks.push(t);
+    }
+    return ticks;
+  }
+
+  function labelUnit(intv) {
+    if (intv.unit === 'year') return 'year';
+    if (intv.unit === 'month') return 'month';
+    if (intv.unit === 'day' || intv.unit === 'week') return 'day';
+    if (intv.unit === 'hour') return 'hour';
+    return 'minute';
+  }
+
+  function fmt(date, unit) {
+    const pad = n => String(n).padStart(2, '0');
+    const mon = date.toLocaleString('en-US', {month: 'short'});
+    switch (unit) {
+      case 'year':
+        return String(date.getFullYear());
+      case 'month':
+        if (date.getMonth() === 0) return String(date.getFullYear());
+        return `${mon} ${date.getFullYear()}`;
+      case 'day':
+        if (date.getDate() === 1) return `${mon} ${date.getFullYear()}`;
+        return `${date.getDate()} ${mon}`;
+      case 'hour':
+        if (date.getHours() === 0 && date.getMinutes() === 0)
+          return `${date.getDate()} ${mon}`;
+        return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      default:
+        if (date.getMinutes() === 0 && date.getSeconds() === 0)
+          return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        return `${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+  }
+
   function render() {
     const style = getComputedStyle(svg.parentElement);
     const width =
@@ -162,6 +279,38 @@ function showTimeSeries(data) {
       item.addEventListener('mouseenter', () => highlight(true));
       item.addEventListener('mouseleave', () => highlight(false));
     });
+
+    const intv = chooseInterval(minX, maxX);
+    const ticks = generateTicks(minX, maxX, intv);
+    const lu = labelUnit(intv);
+    const rotate = ticks.length > 0 && (width - 60) / ticks.length < 60;
+    const axis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    axisLine.setAttribute('x1', xScale(minX));
+    axisLine.setAttribute('x2', xScale(maxX));
+    axisLine.setAttribute('y1', height - 30);
+    axisLine.setAttribute('y2', height - 30);
+    axisLine.setAttribute('stroke', '#000');
+    axis.appendChild(axisLine);
+    ticks.forEach(t => {
+      const x = xScale(t);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x);
+      line.setAttribute('y1', height - 30);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', height - 25);
+      line.setAttribute('stroke', '#000');
+      axis.appendChild(line);
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', x);
+      text.setAttribute('y', height - 10);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('class', 'tick-label' + (rotate ? ' rotated' : ''));
+      if (rotate) text.setAttribute('transform', `rotate(-45 ${x} ${height - 10})`);
+      text.textContent = fmt(new Date(t), lu);
+      axis.appendChild(text);
+    });
+    svg.appendChild(axis);
   }
 
   render();
