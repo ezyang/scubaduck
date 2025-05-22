@@ -759,7 +759,10 @@ let columnsInitialized = false;
   tableSel.addEventListener('change', () => {
     loadColumns(tableSel.value).then(() => {
       if (columnsInitialized) {
-        applyParams(parseSearch());
+        // keep the newly selected table when updating from the URL
+        const params = parseSearch();
+        params.table = tableSel.value;
+        applyParams(params);
       }
     });
   });
