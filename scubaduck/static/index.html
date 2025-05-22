@@ -114,6 +114,7 @@
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border: 1px solid #ccc; padding: 4px; box-sizing: border-box; }
     td.numeric { white-space: nowrap; }
+    td.date { white-space: nowrap; }
     th { text-align: left; cursor: pointer; position: relative; }
     th.sorted { color: blue; }
     tr:nth-child(even) td { background: #f9f9f9; }
@@ -1257,6 +1258,7 @@ function renderTable(rows) {
           hour12: true,
           timeZoneName: 'short'
         });
+        td.classList.add('date');
       } else {
         if (col === 'Hits') {
           const pct = totalHits ? ((v / totalHits) * 100).toFixed(1) : '0';
