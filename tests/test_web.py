@@ -1062,6 +1062,14 @@ def test_format_number_function(page: Any, server_url: str) -> None:
     assert vals == ["815.21 K", "999.999", "0.000", "0"]
 
 
+def test_numeric_cell_nowrap(page: Any, server_url: str) -> None:
+    run_query(page, server_url, limit=10)
+    whitespace = page.evaluate(
+        "getComputedStyle(document.querySelector('#results td:nth-child(3)')).whiteSpace"
+    )
+    assert whitespace == "nowrap"
+
+
 def test_derived_column_query(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
