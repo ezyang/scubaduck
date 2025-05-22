@@ -184,6 +184,10 @@
       </div>
       <div id="settings" class="tab-content active">
         <div class="field">
+          <label>Time Column</label>
+          <select id="time_column"></select>
+        </div>
+        <div class="field">
           <label>Start<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
           <div class="rel-box">
             <input id="start" type="text" />
@@ -336,10 +340,13 @@ const integerColumns = [];
 const baseIntegerColumns = [];
 const timeColumns = [];
 const baseTimeColumns = [];
+const timeColumnOptions = [];
+const baseTimeColumnOptions = [];
 const derivedColumns = [];
 let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
+let defaultTimeColumn = '';
 
 function initDropdown(select) {
   const wrapper = document.createElement('div');
@@ -501,39 +508,53 @@ function loadColumns(table) {
     const orderSelect = document.getElementById('order_by');
     const xAxisSelect = document.getElementById('x_axis');
     const groupsEl = document.getElementById('column_groups');
+    const timeColumnSelect = document.getElementById('time_column');
     orderSelect.innerHTML = '';
     xAxisSelect.innerHTML = '';
+    timeColumnSelect.innerHTML = '';
     groupsEl.innerHTML = '';
     allColumns.length = 0;
     stringColumns.length = 0;
     integerColumns.length = 0;
     timeColumns.length = 0;
+    timeColumnOptions.length = 0;
     baseColumns.length = 0;
     baseStringColumns.length = 0;
     baseIntegerColumns.length = 0;
     baseTimeColumns.length = 0;
+    baseTimeColumnOptions.length = 0;
     for (const k in columnTypes) delete columnTypes[k];
     const groups = {
       time: {name: 'Time', cols: [], ul: null},
       integer: {name: 'Integers', cols: [], ul: null},
       string: {name: 'Strings', cols: [], ul: null},
     };
+    const heur = ['timestamp','created','created_at','event_time','time','date','occurred','happened','logged'];
+    let guess = null;
     cols.forEach(c => {
       const t = c.type.toUpperCase();
       columnTypes[c.name] = c.type;
       allColumns.push(c.name);
       baseColumns.push(c.name);
       let g = 'string';
-      if (t.includes('INT')) g = 'integer';
-      if (t.includes('TIMESTAMP')) {
+      const isNumeric = t.includes('INT') || t.includes('DECIMAL') || t.includes('NUMERIC') || t.includes('REAL') || t.includes('DOUBLE') || t.includes('FLOAT') || t.includes('HUGEINT');
+      const isTimeType = t.includes('TIMESTAMP') || t.includes('DATE') || t.includes('TIME');
+      if (isNumeric || isTimeType) {
+        timeColumnOptions.push(c.name);
+        baseTimeColumnOptions.push(c.name);
+        if (!guess && heur.some(h => c.name.toLowerCase().includes(h))) guess = c.name;
+      }
+      if (isTimeType) {
         g = 'time';
         timeColumns.push(c.name);
         baseTimeColumns.push(c.name);
+      } else if (isNumeric) {
+        g = 'integer';
       }
       if (g === 'string') {
         stringColumns.push(c.name);
         baseStringColumns.push(c.name);
-      } else {
+      } else if (g === 'integer') {
         integerColumns.push(c.name);
         baseIntegerColumns.push(c.name);
       }
@@ -551,6 +572,13 @@ function loadColumns(table) {
       o.textContent = name;
       xAxisSelect.appendChild(o);
     });
+    timeColumnOptions.forEach(name => {
+      const o = document.createElement('option');
+      o.value = name;
+      o.textContent = name;
+      timeColumnSelect.appendChild(o);
+    });
+    defaultTimeColumn = guess || timeColumnOptions[0] || '';
     Object.keys(groups).forEach(key => {
       const g = groups[key];
       const div = document.createElement('div');
@@ -710,7 +738,11 @@ function isIntegerColumn(name) {
 
 function isTimeColumn(name) {
   const t = (columnTypes[name] || '').toUpperCase();
-  return t.includes('TIMESTAMP');
+  if (t.includes('TIMESTAMP') || t.includes('DATE') || t.includes('TIME')) return true;
+  const sel = document.getElementById('time_column').value;
+  const xsel = document.getElementById('x_axis').value;
+  if (name === sel || name === xsel) return true;
+  return false;
 }
 
 function formatNumber(val) {
@@ -861,6 +893,7 @@ function refreshDerivedColumns() {
   stringColumns.splice(0, stringColumns.length, ...baseStringColumns);
   integerColumns.splice(0, integerColumns.length, ...baseIntegerColumns);
   timeColumns.splice(0, timeColumns.length, ...baseTimeColumns);
+  timeColumnOptions.splice(0, timeColumnOptions.length, ...baseTimeColumnOptions);
   derivedColumns.forEach(d => {
     d.type = d.el.querySelector('.d-type').value;
     d.name = d.el.querySelector('.d-name').value;
@@ -872,6 +905,7 @@ function refreshDerivedColumns() {
       stringColumns.push(d.name);
     } else {
       integerColumns.push(d.name);
+      timeColumnOptions.push(d.name);
     }
   });
   updateSelectedColumns();
@@ -914,6 +948,7 @@ function collectParams() {
   updateSelectedColumns();
   const payload = {
     table: document.getElementById('table').value,
+    time_column: document.getElementById('time_column').value,
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
@@ -956,6 +991,7 @@ function collectParams() {
 function paramsToSearch(params) {
   const sp = new URLSearchParams();
   if (params.table) sp.set('table', params.table);
+  if (params.time_column) sp.set('time_column', params.time_column);
   if (params.start) sp.set('start', params.start);
   if (params.end) sp.set('end', params.end);
   if (params.order_by) sp.set('order_by', params.order_by);
@@ -981,6 +1017,7 @@ function paramsToSearch(params) {
 
 function applyParams(params) {
   if (params.table) document.getElementById('table').value = params.table;
+  document.getElementById('time_column').value = params.time_column || defaultTimeColumn;
   document.getElementById('start').value = params.start || '';
   document.getElementById('end').value = params.end || '';
   if (params.order_by) {
@@ -1039,6 +1076,7 @@ function parseSearch() {
   const sp = new URLSearchParams(window.location.search);
   const params = {};
   if (sp.has('table')) params.table = sp.get('table');
+  if (sp.has('time_column')) params.time_column = sp.get('time_column');
   if (sp.has('start')) params.start = sp.get('start');
   if (sp.has('end')) params.end = sp.get('end');
   if (sp.has('order_by')) params.order_by = sp.get('order_by');
@@ -1125,7 +1163,13 @@ function renderTable(rows) {
       const col = selectedColumns[i];
       const td = document.createElement('td');
       if (isTimeColumn(col)) {
-        const d = new Date(v);
+        let d;
+        const t = (columnTypes[col] || '').toUpperCase();
+        if (t.includes('TIMESTAMP') || t.includes('DATE') || t.includes('TIME')) {
+          d = new Date(v);
+        } else {
+          d = new Date(Number(v) * 1000);
+        }
         td.textContent = d.toLocaleString('en-US', {
           weekday: 'short',
           month: 'short',
