@@ -13,7 +13,7 @@ function showTimeSeries(data) {
     view.innerHTML = '<p id="empty-message">Empty data provided to table</p>';
     return;
   }
-  const height = 400;
+  const height = 600;
   view.innerHTML =
     '<div id="ts-container"><div id="legend"></div><div id="chart-wrapper"><svg id="chart" height="' +
     height +
@@ -281,7 +281,7 @@ function showTimeSeries(data) {
       el.setAttribute('d', path.trim());
       el.setAttribute('fill', 'none');
       el.setAttribute('stroke', color);
-      el.setAttribute('stroke-width', '1');
+      el.setAttribute('stroke-width', '1.3');
       svg.appendChild(el);
       const idx = key.lastIndexOf(':');
       const groupKey = idx === -1 ? 'all' : key.slice(0, idx);
@@ -314,7 +314,7 @@ function showTimeSeries(data) {
       group.items.appendChild(item);
 
       function highlight(on) {
-        el.setAttribute('stroke-width', on ? '3' : '1');
+        el.setAttribute('stroke-width', on ? '2.5' : '1.3');
         item.classList.toggle('highlight', on);
       }
 
@@ -341,7 +341,7 @@ function showTimeSeries(data) {
     axisLine.setAttribute('x2', xScale(maxX));
     axisLine.setAttribute('y1', height - 30);
     axisLine.setAttribute('y2', height - 30);
-    axisLine.setAttribute('stroke', '#000');
+    axisLine.setAttribute('stroke', '#888');
     axis.appendChild(axisLine);
     ticks.forEach(t => {
       const x = xScale(t);
@@ -350,7 +350,7 @@ function showTimeSeries(data) {
       line.setAttribute('y1', height - 30);
       line.setAttribute('x2', x);
       line.setAttribute('y2', height - 25);
-      line.setAttribute('stroke', '#000');
+      line.setAttribute('stroke', '#888');
       axis.appendChild(line);
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       text.setAttribute('x', x);

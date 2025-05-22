@@ -270,7 +270,7 @@ def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
     width = page.evaluate(
         "getComputedStyle(document.querySelector('#chart path')).strokeWidth"
     )
-    assert "3" in width
+    assert "2.5" in width
     color = page.evaluate(
         "getComputedStyle(document.querySelector('#legend .legend-item')).backgroundColor"
     )
