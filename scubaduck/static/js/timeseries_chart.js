@@ -23,13 +23,18 @@ function showTimeSeries(data) {
   const bucketMs = (data.bucket_size || 3600) * 1000;
   const start = data.start ? parseTs(data.start) : null;
   const end = data.end ? parseTs(data.end) : null;
+  const startIdx = 1 + groups.length + hasHits;
+  const valueCols = selectedColumns.slice(groups.length + hasHits);
   const series = {};
   data.rows.forEach(r => {
     const ts = parseTs(r[0]);
-    const key = groups.map((_, i) => r[1 + i]).join(':') || 'all';
-    const val = Number(r[1 + groups.length + hasHits]);
-    if (!series[key]) series[key] = {};
-    series[key][ts] = val;
+    const groupKey = groups.map((_, i) => r[1 + i]).join(':') || 'all';
+    valueCols.forEach((name, i) => {
+      const val = Number(r[startIdx + i]);
+      const key = groupKey === 'all' ? name : groupKey + ':' + name;
+      if (!series[key]) series[key] = {};
+      series[key][ts] = val;
+    });
   });
 
   const buckets = [];
