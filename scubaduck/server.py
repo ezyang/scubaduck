@@ -51,7 +51,9 @@ def _normalize_sqlite_type(sql: str) -> str:
     if "(" in t:
         t = t.split("(", 1)[0]
     if "INT" in t:
-        return "INTEGER"
+        # SQLite only has a single INTEGER type which is always 64-bit.
+        # Use DuckDB's BIGINT to avoid overflow when values exceed INT32.
+        return "BIGINT"
     if any(key in t for key in ("CHAR", "CLOB", "TEXT")):
         return "VARCHAR"
     if "BLOB" in t:
