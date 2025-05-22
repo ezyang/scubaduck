@@ -223,6 +223,16 @@ def test_graph_type_timeseries_fields(page: Any, server_url: str) -> None:
     assert page.is_visible("#fill_field")
 
 
+def test_limit_persists_per_chart_type(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    assert page.input_value("#limit") == "100"
+    select_value(page, "#graph_type", "timeseries")
+    assert page.input_value("#limit") == "7"
+    select_value(page, "#graph_type", "samples")
+    assert page.input_value("#limit") == "100"
+
+
 def test_timeseries_default_query(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
