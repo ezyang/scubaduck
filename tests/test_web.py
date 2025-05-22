@@ -45,6 +45,18 @@ def run_query(
     if aggregate is not None:
         select_value(page, "#graph_type", "table")
         select_value(page, "#aggregate", aggregate)
+    if page.input_value("#graph_type") != "samples":
+        page.click("text=Columns")
+        page.wait_for_selector("#column_groups input", state="attached")
+        if not page.is_checked("#column_groups input[value='value']"):
+            page.check("#column_groups input[value='value']")
+        order_col = order_by or page.input_value("#order_by")
+        if order_col and not page.is_checked(
+            f"#column_groups input[value='{order_col}']"
+        ):
+            if page.query_selector(f"#column_groups input[value='{order_col}']"):
+                page.check(f"#column_groups input[value='{order_col}']")
+        page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -233,10 +245,31 @@ def test_limit_persists_per_chart_type(page: Any, server_url: str) -> None:
     assert page.input_value("#limit") == "100"
 
 
+def test_columns_persist_per_chart_type(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    page.uncheck("#column_groups input[value='value']")
+    select_value(page, "#graph_type", "timeseries")
+    count = page.evaluate(
+        "document.querySelectorAll('#column_groups input:checked').length"
+    )
+    assert count == 0
+    select_value(page, "#graph_type", "samples")
+    count = page.evaluate(
+        "document.querySelectorAll('#column_groups input:checked').length"
+    )
+    assert count == 3
+
+
 def test_timeseries_default_query(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -253,6 +286,9 @@ def test_timeseries_single_bucket(page: Any, server_url: str) -> None:
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-01 00:00:00")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -266,6 +302,9 @@ def test_timeseries_fill_options(page: Any, server_url: str) -> None:
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-02 03:00:00")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     select_value(page, "#granularity", "1 hour")
 
     select_value(page, "#fill", "0")
@@ -294,6 +333,9 @@ def test_timeseries_hover_highlight(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -318,6 +360,9 @@ def test_timeseries_crosshair(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -346,6 +391,9 @@ def test_timeseries_crosshair_freeze(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -393,6 +441,9 @@ def test_timeseries_auto_timezone(browser: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -408,6 +459,7 @@ def test_timeseries_multi_series(page: Any, server_url: str) -> None:
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
     page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
     page.click("text=Add Derived")
     expr = page.query_selector("#derived_list .derived textarea")
     assert expr
@@ -1139,6 +1191,9 @@ def test_timeseries_resize(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -1174,6 +1229,9 @@ def test_timeseries_no_overflow(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -1187,6 +1245,9 @@ def test_timeseries_axis_ticks(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -1199,6 +1260,9 @@ def test_timeseries_y_axis_labels(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("window.lastResults = undefined")
     page.click("text=Dive")
     page.wait_for_function("window.lastResults !== undefined")
@@ -1212,6 +1276,9 @@ def test_timeseries_interval_offset(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-03 12:00:00")
     select_value(page, "#granularity", "1 hour")
@@ -1235,6 +1302,9 @@ def test_timeseries_legend_values(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.evaluate("g => { groupBy.chips = g; groupBy.renderChips(); }", ["user"])
     select_value(page, "#aggregate", "Avg")
     page.evaluate("window.lastResults = undefined")
@@ -1257,6 +1327,9 @@ def test_timeseries_group_links(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
     select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
     page.fill("#start", "2024-01-01 00:00:00")
     page.fill("#end", "2024-01-02 03:00:00")
     page.evaluate("window.lastResults = undefined")
