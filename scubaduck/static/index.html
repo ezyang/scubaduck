@@ -193,6 +193,12 @@
         <div class="field">
           <label>Time Column</label>
           <select id="time_column"></select>
+          <select id="time_unit" style="margin-left:4px">
+            <option value="s">s</option>
+            <option value="ms">ms</option>
+            <option value="us">us</option>
+            <option value="ns">ns</option>
+          </select>
         </div>
         <div class="field">
           <label>Start<span class="help" title="Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'.">[?]</span></label>
@@ -956,6 +962,7 @@ function collectParams() {
   const payload = {
     table: document.getElementById('table').value,
     time_column: document.getElementById('time_column').value,
+    time_unit: document.getElementById('time_unit').value,
     start: document.getElementById('start').value,
     end: document.getElementById('end').value,
     order_by: document.getElementById('order_by').value,
@@ -999,6 +1006,7 @@ function paramsToSearch(params) {
   const sp = new URLSearchParams();
   if (params.table) sp.set('table', params.table);
   if (params.time_column) sp.set('time_column', params.time_column);
+  if (params.time_unit) sp.set('time_unit', params.time_unit);
   if (params.start) sp.set('start', params.start);
   if (params.end) sp.set('end', params.end);
   if (params.order_by) sp.set('order_by', params.order_by);
@@ -1025,6 +1033,7 @@ function paramsToSearch(params) {
 function applyParams(params) {
   if (params.table) document.getElementById('table').value = params.table;
   document.getElementById('time_column').value = params.time_column || defaultTimeColumn;
+  if (params.time_unit) document.getElementById('time_unit').value = params.time_unit;
   document.getElementById('start').value = params.start || '';
   document.getElementById('end').value = params.end || '';
   if (params.order_by) {
@@ -1084,6 +1093,7 @@ function parseSearch() {
   const params = {};
   if (sp.has('table')) params.table = sp.get('table');
   if (sp.has('time_column')) params.time_column = sp.get('time_column');
+  if (sp.has('time_unit')) params.time_unit = sp.get('time_unit');
   if (sp.has('start')) params.start = sp.get('start');
   if (sp.has('end')) params.end = sp.get('end');
   if (sp.has('order_by')) params.order_by = sp.get('order_by');
@@ -1175,7 +1185,9 @@ function renderTable(rows) {
         if (t.includes('TIMESTAMP') || t.includes('DATE') || t.includes('TIME')) {
           d = new Date(v);
         } else {
-          d = new Date(Number(v) * 1000);
+          const unit = document.getElementById('time_unit').value;
+          const factors = {s: 1000, ms: 1, us: 0.001, ns: 0.000001};
+          d = new Date(Number(v) * (factors[unit] || 1000));
         }
         td.textContent = d.toLocaleString('en-US', {
           weekday: 'short',

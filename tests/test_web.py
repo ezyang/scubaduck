@@ -105,6 +105,14 @@ def test_time_column_dropdown(page: Any, server_url: str) -> None:
     assert page.input_value("#time_column") == "timestamp"
 
 
+def test_time_unit_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#time_unit", state="attached")
+    opts = page.locator("#time_unit option").all_inner_texts()
+    assert "ms" in opts
+    assert page.input_value("#time_unit") == "s"
+
+
 def test_simple_filter(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
