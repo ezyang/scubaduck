@@ -236,6 +236,34 @@ function showTimeSeries(data) {
     }
   }
 
+  function niceNum(range, round) {
+    const exponent = Math.floor(Math.log10(range));
+    const fraction = range / Math.pow(10, exponent);
+    let niceFraction;
+    if (round) {
+      if (fraction < 1.5) niceFraction = 1;
+      else if (fraction < 3) niceFraction = 2;
+      else if (fraction < 7) niceFraction = 5;
+      else niceFraction = 10;
+    } else {
+      if (fraction <= 1) niceFraction = 1;
+      else if (fraction <= 2) niceFraction = 2;
+      else if (fraction <= 5) niceFraction = 5;
+      else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+
+  function niceTicks(min, max, count) {
+    const range = niceNum(max - min || 1, false);
+    const step = niceNum(range / Math.max(count - 1, 1), true);
+    const start = Math.floor(min / step) * step;
+    const end = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = start; v <= end; v += step) ticks.push(v);
+    return ticks;
+  }
+
   function render() {
     const style = getComputedStyle(svg.parentElement);
     const width =
@@ -250,6 +278,36 @@ function showTimeSeries(data) {
     const yRange = maxY - minY || 1;
     const xScale = x => ((x - minX) / xRange) * (width - 60) + 50;
     const yScale = y => height - 30 - ((y - minY) / yRange) * (height - 60);
+    const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.appendChild(grid);
+    const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const yTicks = niceTicks(minY, maxY, 10);
+    yTicks.forEach(v => {
+      const y = yScale(v);
+      const gLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      gLine.setAttribute('x1', xScale(minX));
+      gLine.setAttribute('x2', xScale(maxX));
+      gLine.setAttribute('y1', y);
+      gLine.setAttribute('y2', y);
+      gLine.setAttribute('class', 'grid');
+      grid.appendChild(gLine);
+
+      const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      tick.setAttribute('x1', xScale(minX));
+      tick.setAttribute('x2', xScale(minX) - 5);
+      tick.setAttribute('y1', y);
+      tick.setAttribute('y2', y);
+      tick.setAttribute('stroke', '#000');
+      yAxis.appendChild(tick);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', xScale(minX) - 8);
+      text.setAttribute('y', y + 3);
+      text.setAttribute('text-anchor', 'end');
+      text.setAttribute('class', 'y-tick-label');
+      text.textContent = formatNumber(v);
+      yAxis.appendChild(text);
+    });
     const seriesEls = {};
     const agg = document.getElementById('aggregate').value.toLowerCase();
     const groups = {};
@@ -362,6 +420,7 @@ function showTimeSeries(data) {
       axis.appendChild(text);
     });
     svg.appendChild(axis);
+    svg.appendChild(yAxis);
   }
 
   render();
