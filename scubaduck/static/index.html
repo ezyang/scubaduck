@@ -539,12 +539,23 @@ function updateDisplayTypeUI() {
   updateSelectedColumns(newType);
   displayType = newType;
 }
+function updateTimeFieldVisibility() {
+  const show = document.getElementById('time_column').value !== '';
+  document.getElementById('start').closest('.field').style.display = show
+    ? 'flex'
+    : 'none';
+  document.getElementById('end').closest('.field').style.display = show
+    ? 'flex'
+    : 'none';
+}
 orderDirBtn.addEventListener('click', () => {
   orderDir = orderDir === 'ASC' ? 'DESC' : 'ASC';
   updateOrderDirButton();
 });
 updateOrderDirButton();
 graphTypeSel.addEventListener('change', updateDisplayTypeUI);
+document.getElementById('time_column').addEventListener('change', updateTimeFieldVisibility);
+updateTimeFieldVisibility();
 
 function loadColumns(table) {
   return fetch('/api/columns?table=' + encodeURIComponent(table)).then(r => r.json()).then(cols => {
@@ -559,6 +570,10 @@ function loadColumns(table) {
     defOpt.textContent = '(default)';
     xAxisSelect.appendChild(defOpt);
     timeColumnSelect.innerHTML = '';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '(none)';
+    timeColumnSelect.appendChild(noneOpt);
     groupsEl.innerHTML = '';
     allColumns.length = 0;
     stringColumns.length = 0;
@@ -627,6 +642,7 @@ function loadColumns(table) {
     });
     xAxisSelect.value = '';
     defaultTimeColumn = guess || timeColumnOptions[0] || '';
+    updateTimeFieldVisibility();
     Object.keys(groups).forEach(key => {
       const g = groups[key];
       const div = document.createElement('div');
@@ -1078,6 +1094,7 @@ function paramsToSearch(params) {
 function applyParams(params) {
   if (params.table) document.getElementById('table').value = params.table;
   document.getElementById('time_column').value = params.time_column || defaultTimeColumn;
+  updateTimeFieldVisibility();
   if (params.time_unit) document.getElementById('time_unit').value = params.time_unit;
   document.getElementById('start').value = params.start || '';
   document.getElementById('end').value = params.end || '';
