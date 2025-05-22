@@ -367,6 +367,16 @@ let selectedColumns = [];
 let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
 let defaultTimeColumn = '';
+const limitInput = document.getElementById('limit');
+const limitValues = {
+  samples: parseInt(limitInput.value, 10),
+  table: parseInt(limitInput.value, 10),
+  timeseries: 7
+};
+limitInput.addEventListener('input', () => {
+  limitValues[displayType] = parseInt(limitInput.value, 10);
+  limitInput.dataset.setByUser = '1';
+});
 
 function initDropdown(select) {
   const wrapper = document.createElement('div');
@@ -501,11 +511,12 @@ function updateDisplayTypeUI() {
       g.style.display = showTable || showTS ? 'none' : '';
     }
   });
+  limitValues[displayType] = parseInt(limitInput.value, 10);
+  if (showTS && limitValues.timeseries === undefined) {
+    limitValues.timeseries = 7;
+  }
+  limitInput.value = limitValues[graphTypeSel.value];
   if (showTS) {
-    const lim = document.getElementById('limit');
-    if (!lim.dataset.setByUser) {
-      lim.value = '7';
-    }
     document.querySelectorAll('#column_groups input').forEach(cb => {
       if (isTimeColumn(cb.value) || isStringColumn(cb.value)) {
         cb.checked = false;
@@ -1056,9 +1067,12 @@ function applyParams(params) {
   updateOrderDirButton();
   if (params.limit !== undefined && params.limit !== null) {
     document.getElementById('limit').value = params.limit;
+    limitValues[params.graph_type || 'samples'] = params.limit;
+    limitInput.dataset.setByUser = '1';
   }
   graphTypeSel.value = params.graph_type || 'samples';
   updateDisplayTypeUI();
+  limitInput.value = limitValues[graphTypeSel.value];
   if (params.x_axis) {
     document.getElementById('x_axis').value = params.x_axis;
   } else {
