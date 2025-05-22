@@ -374,6 +374,11 @@ const limitValues = {
   table: parseInt(limitInput.value, 10),
   timeseries: 7
 };
+const columnValues = {
+  samples: [],
+  table: [],
+  timeseries: []
+};
 limitInput.addEventListener('input', () => {
   limitValues[displayType] = parseInt(limitInput.value, 10);
   limitInput.dataset.setByUser = '1';
@@ -499,8 +504,11 @@ function updateOrderDirButton() {
 }
 
 function updateDisplayTypeUI() {
-  const showTable = graphTypeSel.value === 'table';
-  const showTS = graphTypeSel.value === 'timeseries';
+  const prevType = displayType;
+  updateSelectedColumns(prevType);
+  const newType = graphTypeSel.value;
+  const showTable = newType === 'table';
+  const showTS = newType === 'timeseries';
   document.getElementById('group_by_field').style.display = showTable || showTS ? 'flex' : 'none';
   document.getElementById('aggregate_field').style.display = showTable || showTS ? 'flex' : 'none';
   document.getElementById('show_hits_field').style.display = showTable ? 'flex' : 'none';
@@ -512,11 +520,14 @@ function updateDisplayTypeUI() {
       g.style.display = showTable || showTS ? 'none' : '';
     }
   });
-  limitValues[displayType] = parseInt(limitInput.value, 10);
+  limitValues[prevType] = parseInt(limitInput.value, 10);
   if (showTS && limitValues.timeseries === undefined) {
     limitValues.timeseries = 7;
   }
-  limitInput.value = limitValues[graphTypeSel.value];
+  limitInput.value = limitValues[newType];
+  document.querySelectorAll('#column_groups input').forEach(cb => {
+    cb.checked = columnValues[newType].includes(cb.value);
+  });
   if (showTS) {
     document.querySelectorAll('#column_groups input').forEach(cb => {
       if (isTimeColumn(cb.value) || isStringColumn(cb.value)) {
@@ -524,9 +535,9 @@ function updateDisplayTypeUI() {
       }
     });
     document.getElementById('order_by').value = '';
-    updateSelectedColumns();
   }
-  displayType = graphTypeSel.value;
+  updateSelectedColumns(newType);
+  displayType = newType;
 }
 orderDirBtn.addEventListener('click', () => {
   orderDir = orderDir === 'ASC' ? 'DESC' : 'ASC';
@@ -674,6 +685,9 @@ function loadColumns(table) {
       updateSelectedColumns();
     });
     updateSelectedColumns();
+    columnValues.samples = allColumns.slice();
+    columnValues.table = [];
+    columnValues.timeseries = [];
     groupBy = document.getElementById('group_by').closest('.field');
     initChipInput(groupBy, typed =>
       allColumns.filter(c => c.toLowerCase().includes(typed.toLowerCase()))
@@ -739,14 +753,14 @@ document.addEventListener('click', e => {
   });
 });
 
-function updateSelectedColumns() {
+function updateSelectedColumns(type = graphTypeSel.value) {
   const base = allColumns.filter(name => {
     const cb = document.querySelector(`#column_groups input[value="${name}"]`);
     if (!cb || !cb.checked) return false;
-    if (graphTypeSel.value === 'table' && isStringColumn(name)) return false;
+    if (type === 'table' && isStringColumn(name)) return false;
     return true;
   });
-  if (graphTypeSel.value === 'table' || graphTypeSel.value === 'timeseries') {
+  if (type === 'table' || type === 'timeseries') {
     selectedColumns = groupBy.chips.slice();
     if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
     base.forEach(c => {
@@ -761,6 +775,7 @@ function updateSelectedColumns() {
       if (dc.include) selectedColumns.push(dc.name);
     });
   }
+  columnValues[type] = selectedColumns.slice();
 }
 
 function isStringColumn(name) {
@@ -995,6 +1010,9 @@ function collectParams() {
     columns: selectedColumns.filter(c =>
       c !== 'Hits' && !derivedColumns.some(dc => dc.name === c)
     ),
+    samples_columns: columnValues.samples.slice(),
+    table_columns: columnValues.table.slice(),
+    timeseries_columns: columnValues.timeseries.slice(),
     graph_type: graphTypeSel.value,
     filters: Array.from(document.querySelectorAll('#filters .filter')).map(f => {
       const chips = f.chips || [];
@@ -1037,7 +1055,9 @@ function paramsToSearch(params) {
   if (params.order_by) sp.set('order_by', params.order_by);
   if (params.order_dir) sp.set('order_dir', params.order_dir);
   if (params.limit !== null && params.limit !== undefined) sp.set('limit', params.limit);
-  if (params.columns && params.columns.length) sp.set('columns', params.columns.join(','));
+  if (params.samples_columns && params.samples_columns.length) sp.set('samples_columns', params.samples_columns.join(','));
+  if (params.table_columns && params.table_columns.length) sp.set('table_columns', params.table_columns.join(','));
+  if (params.timeseries_columns && params.timeseries_columns.length) sp.set('timeseries_columns', params.timeseries_columns.join(','));
   if (params.filters && params.filters.length) sp.set('filters', JSON.stringify(params.filters));
   if (params.derived_columns && params.derived_columns.length) sp.set('derived_columns', JSON.stringify(params.derived_columns));
   if (params.graph_type) sp.set('graph_type', params.graph_type);
@@ -1087,10 +1107,13 @@ function applyParams(params) {
   }
   if (params.aggregate) document.getElementById('aggregate').value = params.aggregate;
   document.getElementById('show_hits').checked = params.show_hits ?? true;
+  if (params.samples_columns) columnValues.samples = params.samples_columns;
+  if (params.table_columns) columnValues.table = params.table_columns;
+  if (params.timeseries_columns) columnValues.timeseries = params.timeseries_columns;
   document.querySelectorAll('#column_groups input').forEach(cb => {
-    cb.checked = !params.columns || params.columns.includes(cb.value);
+    cb.checked = columnValues[graphTypeSel.value].includes(cb.value);
   });
-  updateSelectedColumns();
+  updateSelectedColumns(graphTypeSel.value);
   const dlist = document.getElementById('derived_list');
   dlist.innerHTML = '';
   derivedColumns.splice(0, derivedColumns.length);
@@ -1131,7 +1154,9 @@ function parseSearch() {
   if (sp.has('order_by')) params.order_by = sp.get('order_by');
   if (sp.has('order_dir')) params.order_dir = sp.get('order_dir');
   if (sp.has('limit')) params.limit = parseInt(sp.get('limit'), 10);
-  if (sp.has('columns')) params.columns = sp.get('columns').split(',').filter(c => c);
+  if (sp.has('samples_columns')) params.samples_columns = sp.get('samples_columns').split(',').filter(c => c);
+  if (sp.has('table_columns')) params.table_columns = sp.get('table_columns').split(',').filter(c => c);
+  if (sp.has('timeseries_columns')) params.timeseries_columns = sp.get('timeseries_columns').split(',').filter(c => c);
   if (sp.has('filters')) {
     try { params.filters = JSON.parse(sp.get('filters')); } catch(e) { params.filters = []; }
   }
