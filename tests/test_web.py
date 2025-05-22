@@ -140,6 +140,18 @@ def test_time_unit_dropdown(page: Any, server_url: str) -> None:
     assert page.input_value("#time_unit") == "s"
 
 
+def test_table_selector_dropdown(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#table option", state="attached")
+    disp = page.query_selector("#table + .dropdown-display")
+    assert disp
+    assert (
+        page.evaluate("getComputedStyle(document.querySelector('#table')).display")
+        == "none"
+    )
+    assert page.query_selector("#table + .dropdown-display + .dropdown-menu input")
+
+
 def test_x_axis_default_entry(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
