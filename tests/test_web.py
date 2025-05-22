@@ -1103,3 +1103,26 @@ def test_timeseries_axis_ticks(page: Any, server_url: str) -> None:
     page.wait_for_selector("#chart text.tick-label", state="attached")
     count = page.eval_on_selector_all("#chart text.tick-label", "els => els.length")
     assert count > 2
+
+
+def test_timeseries_interval_offset(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-03 12:00:00")
+    select_value(page, "#granularity", "1 hour")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart text.tick-label", state="attached")
+    labels = page.eval_on_selector_all(
+        "#chart text.tick-label", "els => els.map(e => e.textContent)"
+    )
+    assert labels
+    assert all(lbl != "00:00" for lbl in labels)
+    times = [lbl for lbl in labels if ":" in lbl]
+    assert times
+    for t in times:
+        h = int(t.split(":")[0])
+        assert h % 4 == 0
