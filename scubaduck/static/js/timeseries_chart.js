@@ -114,7 +114,8 @@ function showTimeSeries(data) {
     bucketPixels: [],
     xScale: null,
     yScale: null,
-    selected: null
+    selected: null,
+    frozen: false
   };
 
   const intervals = [
@@ -426,6 +427,7 @@ function showTimeSeries(data) {
   render();
 
   function hideCrosshair() {
+    if (currentChart.frozen) return;
     crosshairLine.style.display = 'none';
     crosshairDots.style.display = 'none';
     crosshairDots.innerHTML = '';
@@ -438,8 +440,7 @@ function showTimeSeries(data) {
     }
   }
 
-  svg.addEventListener('mouseleave', hideCrosshair);
-  svg.addEventListener('mousemove', e => {
+  function updateCrosshair(e) {
     const rect = svg.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -497,6 +498,22 @@ function showTimeSeries(data) {
       }
       currentChart.seriesEls[best.key].highlight(true);
       currentChart.selected = best.key;
+    }
+  }
+
+  svg.addEventListener('mouseleave', hideCrosshair);
+  svg.addEventListener('mousemove', e => {
+    if (currentChart.frozen) return;
+    updateCrosshair(e);
+  });
+
+  svg.addEventListener('click', e => {
+    if (currentChart.frozen) {
+      currentChart.frozen = false;
+      hideCrosshair();
+    } else {
+      updateCrosshair(e);
+      currentChart.frozen = true;
     }
   });
 
