@@ -82,6 +82,13 @@ def test_time_unit_dropdown(page: Any, server_url: str) -> None:
     assert page.input_value("#time_unit") == "s"
 
 
+def test_time_unit_hidden_when_no_time_column(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#time_column option", state="attached")
+    select_value(page, "#time_column", "")
+    assert page.is_hidden("#time_unit")
+
+
 def test_table_selector_dropdown(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#table option", state="attached")
