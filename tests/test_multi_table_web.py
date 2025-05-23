@@ -34,3 +34,19 @@ def test_table_param_updates_on_dive(page: Any, multi_table_server_url: str) -> 
         "new URLSearchParams(window.location.search).get('table')"
     )
     assert table_param == "extra"
+
+
+def test_table_dropdown_persists_on_refresh(
+    page: Any, multi_table_server_url: str
+) -> None:
+    page.goto(multi_table_server_url + "?table=events")
+    page.wait_for_selector("#table option", state="attached")
+    select_value(page, "#table", "extra")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.reload()
+    page.wait_for_selector("#table option", state="attached")
+    assert page.input_value("#table") == "extra"
+    disp = page.text_content("#table + .dropdown-display")
+    assert disp is not None and disp.strip() == "extra"
