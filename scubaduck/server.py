@@ -164,6 +164,21 @@ def _numeric_to_datetime(value: int | float, unit: str) -> datetime:
     return dt
 
 
+def _suggest_time_unit(value: int | float, given: str) -> str | None:
+    """Return a plausible time unit for ``value`` not equal to ``given``."""
+
+    for unit in ("s", "ms", "us", "ns"):
+        if unit == given:
+            continue
+        try:
+            dt = _numeric_to_datetime(value, unit)
+        except Exception:
+            continue
+        if 1990 <= dt.year <= 2500:
+            return unit
+    return None
+
+
 def _granularity_seconds(granularity: str, start: str | None, end: str | None) -> int:
     gran = granularity.lower()
     mapping = {
@@ -642,32 +657,20 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 try:
                     mn = _numeric_to_datetime(mn, params.time_unit)
                 except Exception:
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"Invalid time value {mn} for column {axis}"
-                                    f" with time_unit {params.time_unit}"
-                                )
-                            }
-                        ),
-                        400,
-                    )
+                    suggestion = _suggest_time_unit(mn, params.time_unit)
+                    msg = f"Invalid time value {mn} for column {axis} with time_unit {params.time_unit}"
+                    if suggestion:
+                        msg += f"; maybe try time_unit {suggestion}"
+                    return jsonify({"error": msg}), 400
             if isinstance(mx, (int, float)):
                 try:
                     mx = _numeric_to_datetime(mx, params.time_unit)
                 except Exception:
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"Invalid time value {mx} for column {axis}"
-                                    f" with time_unit {params.time_unit}"
-                                )
-                            }
-                        ),
-                        400,
-                    )
+                    suggestion = _suggest_time_unit(mx, params.time_unit)
+                    msg = f"Invalid time value {mx} for column {axis} with time_unit {params.time_unit}"
+                    if suggestion:
+                        msg += f"; maybe try time_unit {suggestion}"
+                    return jsonify({"error": msg}), 400
             if params.start is None and mn is not None:
                 params.start = (
                     mn.strftime("%Y-%m-%d %H:%M:%S") if not isinstance(mn, str) else mn
