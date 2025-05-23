@@ -327,7 +327,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         selected_for_order.update(params.columns)
 
     order_by = params.order_by
-    if order_by == "Samples":
+    if order_by and str(order_by).strip().lower() == "samples":
         order_by = "Hits"
     order_by = order_by if order_by in selected_for_order else None
 
@@ -531,7 +531,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             time_column=payload.get("time_column", "timestamp"),
             time_unit=payload.get("time_unit", "s"),
         )
-        if params.order_by == "Samples":
+        if params.order_by and params.order_by.strip().lower() == "samples":
             params.order_by = "Hits"
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))

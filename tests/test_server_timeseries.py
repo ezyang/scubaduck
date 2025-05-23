@@ -357,6 +357,28 @@ def test_order_by_samples_timeseries() -> None:
     assert 'ORDER BY "Hits" DESC' in data["sql"]
 
 
+def test_order_by_samples_case_insensitive() -> None:
+    app = server.app
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
+        "order_by": "samples",
+        "order_dir": "DESC",
+        "limit": 10,
+        "columns": [],
+        "group_by": ["user"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert 'ORDER BY "Hits" DESC' in data["sql"]
+
+
 def test_show_hits_client_side() -> None:
     app = server.app
     client = app.test_client()
