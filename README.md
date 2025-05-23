@@ -1,52 +1,107 @@
-I really like Scuba (Meta's internal real-time database system). The distributed, real-time database part of Scuba is quite difficult (and expensive) to replicate, but I also really like Scuba's UI for doing queries, and I have found myself wishing that I have access to it even for "small" databases, e.g., I have a sqlite dataset I want to explore.
+# ScubaDuck
 
-Pivotal ideas:
+ScubaDuck is a reimplementation of the frontend query interface for
+[Scuba](https://research.facebook.com/publications/scuba-diving-into-data-at-facebook/)
+(Meta's internal real-time database system) with DuckDB as the backing
+database implementation.  This implementation misses most of the main value
+add of Scuba (a distributed, real-time database that supports fast queries),
+but I also think Scuba's UI for doing queries is great and I have found myself
+wishing that I have access to it even for "small" databases, e.g., I have a
+sqlite dataset I want to explore.  ScubaDuck is this interface.
 
-* Time series by default. In the dedicated "time series" view, there are many features specifically oriented towards working towards tables that represent events that occurred over time: the start, end, compare, aggregate and granularity fields all specially privilege the timestamp field. In fact, you can't log events to Scuba's backing data store without a timestamp, they always come with one. (Scuba also supports other views that don't presuppose a time series, but the time series is the most beloved and well used view.) This is in contrast to typical software which tries to generalize to arbitrary data first, with time series being added on later.
+This application was entirely vibe coded using OpenAI Codex.  It has no
+third-party JS dependencies; everything was coded from scratch.
 
-* It's all about exploration. Scuba is predicated on the idea that you don't know what you're looking for, that you are going to spend time tweaking queries and changing filters/grouping as part of an investigation to figure out why a system behaves the way it is. So the filters/comparisons/groupings you want to edit are always visible on the left sidebar, with the expectation that you're going to tweak the query to look at something else. Similarly, all the parameters of your query get saved into your URL, so your browser history can double up as a query history / you can easily share a query with someone else. This is contrast to typical software which is often oriented to making pretty dashboards and reports. (This function is important too, but it's not what I want in exploration mode!)
+## Design Philosophy
 
-* You can fix data problems in the query editor. It's pretty common to have messed up and ended up with a database that doesn't have exactly the columns you need, or some columns that are corrupted in some way. Scuba has pretty robust support for defining custom columns with arbitrary SQL functions, grouping over them as if they were native functions, and doing so with minimal runtime cost (Scuba aims to turn around your query in milliseconds!) Having to go and run a huge data pipeline to fix your data is a big impediment to exploration; quick and easy custom columns means you can patch over problems when you're investigating and fix them for real later.
+* **Time series by default.** In the dedicated "time series" view, there are
+  many features specifically oriented towards working towards tables that
+  represent events that occurred over time: the start, end, compare, aggregate
+  and granularity fields all specially privilege the timestamp field. In fact,
+  you can't log events to Scuba's backing data store without a timestamp, they
+  always come with one.  ScubaDuck is a little more flexible here (since you
+  might be ingesting arbitrary database tables that weren't specifically
+  designed for realtime databases), but it really shines when you have time
+  series data.  This is in contrast to typical software which tries to work
+  with arbitrary data first, with time series being added on later.
 
-We're going to build a exploratory data analysis tool like Scuba for time series database (i.e., a database with a mandatory timestamp representing the time an event occurred).  We'll use DuckDB as the underlying SQL engine served from a Python server, and render the GUI/results as a webpage with vanilla HTML and JS. We'll use choices.js to support token inputs.  We define a token input to mean a text input element where as you type a dropdown displays with valid values, and if you select one or press enter, the selection turns into a token/chip that can only be deleted as one unit.
+* **It's all about exploration.** Scuba is predicated on the idea that you
+  don't know what you're looking for, that you are going to spend time
+  tweaking queries and changing filters/grouping as part of an investigation
+  to figure out why a system behaves the way it is. So the
+  filters/comparisons/groupings you want to edit are always visible on the
+  left sidebar, with the expectation that you're going to tweak the query to
+  look at something else. Similarly, all the parameters of your query get
+  saved into your URL, so your browser history can double up as a query
+  history / you can easily share a query with someone else. This is contrast
+  to typical software which is often oriented to making pretty dashboards and
+  reports. (This function is important too, but it's not what I want in
+  exploration mode!)
 
-To start, we are going to support one views: samples.  The samples view only allows you to view individual samples from the database, subject to a filter. Our main UI concept is that there is a left sidebar that is the query editor, and the right side that shows the view.  The sidebar is always visible and defaults to the query parameters of the current view.  After you make changes to the query, clicking the "Dive" button updates the view.  The URL of the page encodes all of the values of the query (and gets updated when you Dive), so the browser's back button lets you view previous queries.
+* **You can fix data problems in the query editor.** It's pretty common to
+  have messed up and ended up with a database that doesn't have exactly the
+  columns you need, or some columns that are corrupted in some way. Scuba has
+  pretty robust support for defining custom columns with arbitrary SQL
+  functions, grouping over them as if they were native functions, and doing so
+  with minimal runtime cost (Scuba aims to turn around your query in
+  milliseconds!) Having to go and run a huge data pipeline to fix your data is
+  a big impediment to exploration; quick and easy custom columns means you can
+  patch over problems when you're investigating and fix them for real later.
 
-The query editor's job is to generate a SQL query, which then is applied on the database, and then the result visualized according to the view.
-
-Here are the settings you can apply to the query. The help text should show up when you mouse over the field name:
-
-* Start/End - Help text: "Sets the start/end of the time range to query. Can be any kind of datetime string. For example: 'April 23, 2014' or 'yesterday'." The UI for this selector supports both relative selections (now, -1 hour, -3 hours, -12 hours, -1 day, -3 days, -1 week, -1 fortnight, -30 days, -90 days, -1 month, -1 year) as well as specifying an absolute date.  The way this field is rendered is there is a free form text box, a drop down arrow (for the relative selectors), and then a calendar button (for date selection).
-* Order By - Help text: "Choose a column to sort results by."  There is an ASC/DESC toggle next to it.
-* Limit - Help text: "Choose the maximum number of results to show in the chart after any aggregations have been applied.  For example, a limit of 10 will show no more than 10 rows for a table, etc."
-* Filters - You can create as many filters as you want. You can either write a filter using a UI or manual SQL. In the UI, filter consists of a column name, a relation (e.g., =, !=, <, >) and then a text field. The text field is a token input. It accepts multiple tokens for = relation, in which case we match using an OR for all options. 
-
-There is also a "Columns" tab which lets you view all fields in the table, organized by their type. You can also define derived columns, by specifying a column name and SQL expression. Derived columns can be used for all parts of the UI, including filters/group by/etc. Columns have checkboxes indicating if we should SELECT them or not. Each selected column shows up in the graph.  There is an All/None link which can be used to select/deselect all checkboxes.
-
-The query UI constructs a SQL query that intuitively has this form:
+## Development
 
 ```
-SELECT column, column, ...,
-FROM table
-WHERE time >= min-timestamp
-AND time <= max-timestamp
-[AND condition ...]
-ORDER BY aggregate(column)
-LIMIT number
+uv sync --frozen
+SCUBADUCK_DB=/path/to/foo.sqlite flask --app scubaduck.server run --debug
 ```
 
-You should write tests for the server backend, demonstrating that at specific query values we get back the correct rows of data.
+DuckDB databases and Parquet files work too.  Omit to get a simple test dataset, or
+`SCUBADUCK_DB=TEST` for a more complicated test dataset.
 
-## Running the server
+## How to use it
 
-Activate the virtual environment and run the Flask development server:
+After you've loaded a database and navigate to the application, the home page
+will pop up the first table in your database and display a hundred samples
+from it.  When you're working with a table for the first time, it's a good
+idea to look at some samples by hand and get a feel for what's stored in it.
+(Better is to have designed the table with ScubaDuck visualization in mind.)
 
-```bash
-flask --app scubaduck.server run --debug
-```
+Samples lets you look at entries one-by-one, but typically you'll have too
+many things to look at one by one.  Table gives you simple aggregation
+capabilities: you can use Group by to get some high level aggregate statistics
+at various breakdowns.
 
-By default the server loads `sample.csv`. Set the `SCUBADUCK_DB` environment
-variable to point at a different database file (CSV, Parquet, SQLite or DuckDB) if you
-want to use another dataset. The special value `TEST` starts the server with a
-small in-memory SQLite dataset used by the automated tests. If the file does
-not exist, the server will raise a `FileNotFoundError` during startup.
+The real juice of Scuba is time series visualization.  Assuming your table has
+a time column, you can plot any numeric column on a graph.  With group by, you
+can split into multiple series, aggregating over each value of the group by.
+You can easily drill down / drill back up, looking for patterns that only show
+up on certain splits.
+
+Whenever you Dive, ScubaDuck will update your URL with all of the information
+for your query.  If you save these URLs, you have a durable record of the
+query you made (assuming your ScubaDuck server is still running!)
+
+Happy diving!
+
+## Roadmap
+
+- Scuba works best with denormalized tables that don't require JOINs.  Scuba
+  at Meta in fact does not support JOINs.  DuckDB does support JOINs, so we
+  need to come up with a good UI for exposing them.
+
+- There is some extra metadata you might want to persistently save about a
+  database that will help ScubaDuck show it to you in the future.  For
+  example, ScubaDuck will always abbreviate integers with SI prefixes, but if
+  an integer is actually an ID of some sort, this is counterproductive and you
+  probably prefer to render the actual ID.  Similarly, ScubaDuck tries to
+  infer what the timestamp column is, but if it gets it wrong you'd like to
+  durably save the correct choice.  Unfortunately, ScubaDuck as it currently
+  exists is entirely stateless (state lives only in the URL parameters you get
+  when you Dive.)  I'm thinking of adding a sidecar file that ScubaDuck can
+  write to next to your database that contains some metadata and then expand
+  the UI to allow for more complicated persistent settings.
+
+- Codex is not very smart and mostly implemented things exactly as I asked for
+  it.  This means there are many places where there are bugs or lacking polish
+  because I hadn't realized I needed to prompt for it.  Bug reports are
+  appreciated, I will feed them to Codex to get them fixed.
