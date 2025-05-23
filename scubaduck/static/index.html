@@ -750,6 +750,7 @@ let columnsInitialized = false;
     if (disp) disp.style.minWidth = maxWidth + 30 + 'px';
     const table = parseSearch().table || tables[0];
     tableSel.value = table;
+    tableSel.dispatchEvent(new Event('change'));
   loadColumns(table).then(() => {
     updateDisplayTypeUI();
     addFilter();
