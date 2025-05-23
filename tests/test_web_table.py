@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.web_utils import run_query
+from tests.web_utils import run_query, select_value
 
 
 def test_table_sorting(page: Any, server_url: str) -> None:
@@ -213,6 +213,7 @@ def test_table_avg_no_group_by(page: Any, server_url: str) -> None:
         page,
         server_url,
         aggregate="Avg",
+        order_by="timestamp",
     )
     assert len(data["rows"]) == 1
     row = data["rows"][0]
@@ -229,6 +230,7 @@ def test_table_headers_show_aggregate(page: Any, server_url: str) -> None:
         page,
         server_url,
         aggregate="Avg",
+        order_by="timestamp",
     )
     headers = page.locator("#results th").all_inner_texts()
     assert "Hits" in headers
@@ -246,7 +248,7 @@ def test_format_number_function(page: Any, server_url: str) -> None:
 
 
 def test_numeric_cell_nowrap(page: Any, server_url: str) -> None:
-    run_query(page, server_url, limit=10)
+    run_query(page, server_url, order_by="timestamp", limit=10)
     whitespace = page.evaluate(
         "getComputedStyle(document.querySelector('#results td:nth-child(3)')).whiteSpace"
     )
@@ -254,7 +256,7 @@ def test_numeric_cell_nowrap(page: Any, server_url: str) -> None:
 
 
 def test_date_cell_nowrap(page: Any, server_url: str) -> None:
-    run_query(page, server_url, limit=10)
+    run_query(page, server_url, order_by="timestamp", limit=10)
     whitespace = page.evaluate(
         "getComputedStyle(document.querySelector('#results td:nth-child(1)')).whiteSpace"
     )
@@ -264,6 +266,7 @@ def test_date_cell_nowrap(page: Any, server_url: str) -> None:
 def test_derived_column_query(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#order_by option", state="attached")
+    select_value(page, "#order_by", "timestamp")
     page.click("text=Columns")
     page.click("text=Add Derived")
     expr = page.query_selector("#derived_list .derived textarea")
