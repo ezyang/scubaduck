@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.web_utils import run_query
+from tests.web_utils import run_query, select_value
 
 
 def test_table_sorting(page: Any, server_url: str) -> None:
@@ -304,3 +304,26 @@ def test_sql_query_display(page: Any, server_url: str) -> None:
     displayed = page.text_content("#sql_query")
     assert displayed is not None
     assert displayed.strip() == sql
+
+
+def test_table_count_headings(page: Any, multi_table_server_url: str) -> None:
+    page.goto(f"{multi_table_server_url}?graph_type=table")
+    page.wait_for_selector("#order_by option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    page.click("#columns_all")
+    page.click("text=View Settings")
+    page.evaluate("g => { groupBy.chips = g; groupBy.renderChips(); }", ["id"])
+    select_value(page, "#aggregate", "Count")
+    select_value(page, "#order_by", "id")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    headers = page.locator("#results th").all_inner_texts()
+    assert headers == ["id", "Hits"]
+    row_count = page.evaluate("document.querySelectorAll('#results tr').length")
+    assert row_count == 3
+    col_count = page.evaluate(
+        "document.querySelectorAll('#results tr:nth-child(2) td').length"
+    )
+    assert col_count == 2

@@ -435,22 +435,32 @@ function updateSelectedColumns(type = graphTypeSel.value) {
     if (type === 'table' && isStringColumn(name)) return false;
     return true;
   });
+  let storeCols;
   if (type === 'table' || type === 'timeseries') {
-    selectedColumns = groupBy.chips.slice();
-    if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
+    storeCols = groupBy.chips.slice();
+    if (document.getElementById('show_hits').checked) storeCols.push('Hits');
     base.forEach(c => {
-      if (!selectedColumns.includes(c)) selectedColumns.push(c);
+      if (!storeCols.includes(c)) storeCols.push(c);
     });
     derivedColumns.forEach(dc => {
-      if (dc.include && !selectedColumns.includes(dc.name)) selectedColumns.push(dc.name);
+      if (dc.include && !storeCols.includes(dc.name)) storeCols.push(dc.name);
     });
+    selectedColumns = storeCols.slice();
+    if (type === 'table') {
+      const agg = document.getElementById('aggregate').value.toLowerCase();
+      if (agg === 'count') {
+        selectedColumns = groupBy.chips.slice();
+        if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
+      }
+    }
   } else {
     selectedColumns = base.slice();
     derivedColumns.forEach(dc => {
       if (dc.include) selectedColumns.push(dc.name);
     });
+    storeCols = selectedColumns.slice();
   }
-  columnValues[type] = selectedColumns.slice();
+  columnValues[type] = storeCols.slice();
   updateColumnsTabCount();
 }
 

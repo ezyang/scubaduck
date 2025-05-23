@@ -248,14 +248,19 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             return f"{agg}({expr})"
 
         if agg == "count":
-            select_parts.append("count(*) AS Count")
+            if params.graph_type == "table" and params.show_hits:
+                select_parts.insert(len(group_cols), "count(*) AS Hits")
+            else:
+                select_parts.append("count(*) AS Count")
+                if params.show_hits:
+                    select_parts.insert(len(group_cols), "count(*) AS Hits")
         else:
             for col in params.columns:
                 if col in group_cols:
                     continue
                 select_parts.append(f"{agg_expr(col)} AS {_quote(col)}")
-        if params.show_hits:
-            select_parts.insert(len(group_cols), "count(*) AS Hits")
+            if params.show_hits:
+                select_parts.insert(len(group_cols), "count(*) AS Hits")
     else:
         select_parts.extend(_quote(c) for c in params.columns)
 
