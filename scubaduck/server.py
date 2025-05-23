@@ -296,8 +296,9 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             return f"{agg}({expr})"
 
         if agg == "count":
-            select_parts.append("count(*) AS Count")
-            selected_for_order.add("Count")
+            if params.graph_type != "table":
+                select_parts.append("count(*) AS Count")
+                selected_for_order.add("Count")
         else:
             for col in params.columns:
                 if col in group_cols:
