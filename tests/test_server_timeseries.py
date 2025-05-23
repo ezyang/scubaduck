@@ -268,6 +268,27 @@ def test_reserved_word_column() -> None:
     assert data["rows"][0][1] == "x"
 
 
+def test_table_count_group_by_extra() -> None:
+    app = server.create_app("TEST")
+    client = app.test_client()
+    payload = {
+        "table": "extra",
+        "graph_type": "table",
+        "time_column": "",
+        "group_by": ["num"],
+        "aggregate": "Count",
+        "columns": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    rows = sorted(data["rows"])
+    assert rows == [[1, 1], [2, 1]]
+    assert all(len(r) == 2 for r in rows)
+
+
 def test_order_by_samples_table() -> None:
     app = server.app
     client = app.test_client()
