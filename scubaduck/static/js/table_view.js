@@ -32,7 +32,7 @@ function renderTable(rows) {
       th.classList.add("sorted");
       th.textContent = label + (sortState.dir === "desc" ? " \u25BC" : " \u25B2");
     }
-    if (!isStringColumn(col)) th.style.textAlign = "right";
+    th.style.textAlign = "left";
     header.appendChild(th);
   });
   table.appendChild(header);
