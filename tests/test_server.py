@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import duckdb
 from scubaduck import server
@@ -587,6 +587,7 @@ def test_table_avg_with_timestamp() -> None:
         "limit": 100,
         "columns": ["user", "timestamp", "value"],
         "group_by": ["user"],
+        "aggregate": "Avg",
     }
     rv = client.post(
         "/api/query", data=json.dumps(payload), content_type="application/json"
@@ -648,6 +649,28 @@ def test_timeseries_orders_by_xaxis() -> None:
 
     timestamps = [parser.parse(r[0]).replace(tzinfo=None) for r in rows]
     assert timestamps == sorted(timestamps)
+
+
+def test_timeseries_count_no_columns() -> None:
+    app = server.app
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "granularity": "1 day",
+        "columns": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    rows = data["rows"]
+    assert len(rows) == 2
+    assert rows[0][1] == 2
+    assert rows[1][1] == 2
 
 
 def test_timeseries_limit_applies_to_series() -> None:
@@ -725,9 +748,7 @@ def test_timeseries_string_column_error() -> None:
     rv = client.post(
         "/api/query", data=json.dumps(payload), content_type="application/json"
     )
-    data = rv.get_json()
-    assert rv.status_code == 400
-    assert "Aggregate" in data["error"]
+    assert rv.status_code == 200
 
 
 def test_derived_column_basic() -> None:
@@ -762,6 +783,7 @@ def test_timeseries_derived_column() -> None:
         "limit": 7,
         "columns": ["value"],
         "derived_columns": {"derived_1": "value * 2"},
+        "aggregate": "Avg",
     }
     rv = client.post(
         "/api/query", data=json.dumps(payload), content_type="application/json"
