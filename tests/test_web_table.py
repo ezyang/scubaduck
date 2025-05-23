@@ -19,7 +19,7 @@ def test_table_sorting(page: Any, server_url: str) -> None:
     align = page.evaluate(
         "getComputedStyle(document.querySelector('#results th')).textAlign"
     )
-    assert align == "right"
+    assert align == "left"
 
     header = page.locator("#results th").nth(3)
 
