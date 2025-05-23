@@ -17,9 +17,10 @@ let displayType = 'samples';
 let groupBy = {chips: [], addChip: () => {}, renderChips: () => {}};
 let defaultTimeColumn = '';
 const limitInput = document.getElementById('limit');
+const defaultLimit = parseInt(limitInput.value, 10);
 const limitValues = {
-  samples: parseInt(limitInput.value, 10),
-  table: parseInt(limitInput.value, 10),
+  samples: defaultLimit,
+  table: defaultLimit,
   timeseries: 7
 };
 const columnValues = {
@@ -381,10 +382,8 @@ let columnsInitialized = false;
   tableSel.addEventListener('change', () => {
     loadColumns(tableSel.value).then(() => {
       if (columnsInitialized) {
-        // keep the newly selected table when updating from the URL
-        const params = parseSearch();
-        params.table = tableSel.value;
-        applyParams(params);
+        resetViewSettings();
+        applyParams({table: tableSel.value});
       }
     });
   });
@@ -827,6 +826,39 @@ function applyParams(params) {
   } else {
     addFilter();
   }
+}
+
+function resetViewSettings() {
+  orderDir = 'ASC';
+  updateOrderDirButton();
+  document.getElementById('order_by').value = '';
+  document.getElementById('start').value = '';
+  document.getElementById('end').value = '';
+  document.getElementById('time_unit').value = 's';
+  document.getElementById('granularity').value = 'Auto';
+  document.getElementById('fill').value = '0';
+  document.getElementById('aggregate').value = 'Count';
+  document.getElementById('show_hits').checked = true;
+  document.getElementById('x_axis').value = '';
+  groupBy.chips.splice(0, groupBy.chips.length);
+  groupBy.renderChips();
+  const dlist = document.getElementById('derived_list');
+  dlist.innerHTML = '';
+  derivedColumns.splice(0, derivedColumns.length);
+  refreshDerivedColumns();
+  const flist = document.getElementById('filter_list');
+  flist.innerHTML = '';
+  addFilter();
+  document.getElementById('graph_type').value = 'samples';
+  limitValues.samples = defaultLimit;
+  limitValues.table = defaultLimit;
+  limitValues.timeseries = 7;
+  limitInput.dataset.setByUser = '';
+  updateDisplayTypeUI();
+  document.querySelectorAll('#column_groups input').forEach(cb => {
+    cb.checked = true;
+  });
+  updateSelectedColumns();
 }
 
 function parseSearch() {
