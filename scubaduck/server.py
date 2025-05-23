@@ -304,14 +304,16 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
                     continue
                 select_parts.append(f"{agg_expr(col)} AS {_quote(col)}")
                 selected_for_order.add(col)
-        if params.show_hits:
-            select_parts.insert(len(group_cols), "count(*) AS Hits")
-            selected_for_order.add("Hits")
+        select_parts.insert(len(group_cols), "count(*) AS Hits")
+        selected_for_order.add("Hits")
     else:
         select_parts.extend(_quote(c) for c in params.columns)
         selected_for_order.update(params.columns)
 
-    order_by = params.order_by if params.order_by in selected_for_order else None
+    order_by = params.order_by
+    if order_by == "Samples":
+        order_by = "Hits"
+    order_by = order_by if order_by in selected_for_order else None
 
     if has_agg and params.derived_columns:
         inner_params = replace(
@@ -513,6 +515,8 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             time_column=payload.get("time_column", "timestamp"),
             time_unit=payload.get("time_unit", "s"),
         )
+        if params.order_by == "Samples":
+            params.order_by = "Hits"
         for f in payload.get("filters", []):
             params.filters.append(Filter(f["column"], f["op"], f.get("value")))
 
@@ -541,6 +545,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
 
         valid_cols = set(column_types.keys())
         valid_cols.update(params.derived_columns.keys())
+        valid_cols.add("Hits")
         if params.graph_type == "timeseries":
             if params.x_axis is None:
                 params.x_axis = params.time_column

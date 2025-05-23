@@ -200,6 +200,14 @@ function loadColumns(table) {
     const groupsEl = document.getElementById('column_groups');
     const timeColumnSelect = document.getElementById('time_column');
     orderSelect.innerHTML = '';
+    const orderDef = document.createElement('option');
+    orderDef.value = '';
+    orderDef.textContent = '(default)';
+    orderSelect.appendChild(orderDef);
+    const samplesOpt = document.createElement('option');
+    samplesOpt.value = 'Samples';
+    samplesOpt.textContent = 'Samples';
+    orderSelect.appendChild(samplesOpt);
     xAxisSelect.innerHTML = '';
     const defOpt = document.createElement('option');
     defOpt.value = '';

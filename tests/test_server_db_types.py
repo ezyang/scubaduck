@@ -182,7 +182,7 @@ def test_sqlite_boolean_group_by(tmp_path: Path) -> None:
     data = rv.get_json()
     assert rv.status_code == 200
     rows = sorted(data["rows"])  # order can vary
-    assert rows == [[1, 0.5], [2, 1.0]]
+    assert rows == [[1, 2, 0.5], [2, 1, 1.0]]
 
 
 def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
