@@ -50,3 +50,29 @@ def test_table_dropdown_persists_on_refresh(
     assert page.input_value("#table") == "extra"
     disp = page.text_content("#table + .dropdown-display")
     assert disp is not None and disp.strip() == "extra"
+
+
+def test_table_switch_resets_view_settings(
+    page: Any, multi_table_server_url: str
+) -> None:
+    page.goto(multi_table_server_url + "?table=events")
+    page.wait_for_selector("#table option", state="attached")
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    page.uncheck("#column_groups input:first-of-type")
+    page.click("text=View Settings")
+    select_value(page, "#graph_type", "table")
+    page.fill("#limit", "50")
+    page.evaluate("g => { groupBy.chips = ['name']; groupBy.renderChips(); }")
+    select_value(page, "#table", "extra")
+    page.wait_for_function("document.querySelector('#table').value === 'extra'")
+    assert page.input_value("#graph_type") == "samples"
+    assert page.input_value("#limit") == "100"
+    chips = page.evaluate("groupBy.chips.length")
+    assert chips == 0
+    page.click("text=Columns")
+    page.wait_for_selector("#column_groups input", state="attached")
+    count = page.evaluate(
+        "document.querySelectorAll('#column_groups input:checked').length"
+    )
+    assert count == 3
