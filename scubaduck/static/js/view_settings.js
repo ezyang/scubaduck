@@ -451,6 +451,10 @@ function updateSelectedColumns(type = graphTypeSel.value) {
     });
   }
   columnValues[type] = selectedColumns.slice();
+  const orderCol = document.getElementById('order_by').value;
+  if (orderCol && !selectedColumns.includes(orderCol)) {
+    selectedColumns.push(orderCol);
+  }
   updateColumnsTabCount();
 }
 
