@@ -14,6 +14,7 @@ import math
 
 import duckdb
 from dateutil import parser as dtparser
+from dateutil.relativedelta import relativedelta
 from flask import Flask, jsonify, request, send_from_directory
 
 
@@ -93,7 +94,7 @@ def _create_test_database() -> duckdb.DuckDBPyConnection:
 
 
 _REL_RE = re.compile(
-    r"([+-]?\d+(?:\.\d*)?)\s*(hour|hours|day|days|week|weeks|fortnight|fortnights)",
+    r"([+-]?\d+(?:\.\d*)?)\s*(hour|hours|day|days|week|weeks|fortnight|fortnights|month|months|year|years)",
     re.IGNORECASE,
 )
 
@@ -111,18 +112,28 @@ def parse_time(val: str | None) -> str | None:
     if m:
         qty = float(m.group(1))
         unit = m.group(2).lower()
-        delta: timedelta
+        now = datetime.now(timezone.utc)
+        dt: datetime
         if unit.startswith("hour"):
-            delta = timedelta(hours=qty)
+            dt = now + timedelta(hours=qty)
         elif unit.startswith("day"):
-            delta = timedelta(days=qty)
+            dt = now + timedelta(days=qty)
         elif unit.startswith("week"):
-            delta = timedelta(weeks=qty)
+            dt = now + timedelta(weeks=qty)
         elif unit.startswith("fortnight"):
-            delta = timedelta(weeks=2 * qty)
+            dt = now + timedelta(weeks=2 * qty)
+        elif unit.startswith("month"):
+            if qty.is_integer():
+                dt = now + relativedelta(months=int(qty))
+            else:
+                dt = now + timedelta(days=30 * qty)
+        elif unit.startswith("year"):
+            if qty.is_integer():
+                dt = now + relativedelta(years=int(qty))
+            else:
+                dt = now + timedelta(days=365 * qty)
         else:  # pragma: no cover - defensive
             raise ValueError(f"Unsupported unit: {unit}")
-        dt = datetime.now(timezone.utc) + delta
         return dt.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
 
     dt = dtparser.parse(s)
