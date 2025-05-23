@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from pathlib import Path
+
 from scubaduck import server
 
 
@@ -81,3 +83,22 @@ def test_samples_view_rejects_group_by() -> None:
     data = rv.get_json()
     assert rv.status_code == 400
     assert "only valid" in data["error"]
+
+
+def test_invalid_integer_time_value_suggests_unit(tmp_path: Path) -> None:
+    csv_file = tmp_path / "events.csv"
+    csv_file.write_text("created,event\n1704067200000000,login\n")
+    app = server.create_app(csv_file)
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "columns": ["created"],
+        "time_column": "created",
+        "time_unit": "s",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 400
+    assert "maybe try time_unit us" in data["error"]
