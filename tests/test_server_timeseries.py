@@ -9,7 +9,7 @@ from scubaduck import server
 def test_group_by_table() -> None:
     app = server.app
     client = app.test_client()
-    payload = {
+    payload: dict[str, Any] = {
         "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
@@ -33,7 +33,7 @@ def test_group_by_table() -> None:
 def test_table_avg_with_timestamp() -> None:
     app = server.app
     client = app.test_client()
-    payload = {
+    payload: dict[str, Any] = {
         "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
@@ -54,14 +54,14 @@ def test_table_avg_with_timestamp() -> None:
     assert rows[0][0] == "alice"
     from dateutil import parser
 
-    ts = parser.parse(rows[0][1]).replace(tzinfo=None)
+    ts = parser.parse(rows[0][2]).replace(tzinfo=None)
     assert ts == parser.parse("2024-01-01 12:00:00")
 
 
 def test_timeseries_basic() -> None:
     app = server.app
     client = app.test_client()
-    payload = {
+    payload: dict[str, Any] = {
         "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
@@ -84,7 +84,7 @@ def test_timeseries_basic() -> None:
 def test_timeseries_orders_by_xaxis() -> None:
     app = server.app
     client = app.test_client()
-    payload = {
+    payload: dict[str, Any] = {
         "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
@@ -126,12 +126,13 @@ def test_timeseries_count_no_columns() -> None:
     assert len(rows) == 2
     assert rows[0][1] == 2
     assert rows[1][1] == 2
+    assert len(rows[0]) == 3
 
 
 def test_timeseries_limit_applies_to_series() -> None:
     app = server.app
     client = app.test_client()
-    payload = {
+    payload: dict[str, Any] = {
         "table": "events",
         "start": "2024-01-01 00:00:00",
         "end": "2024-01-03 00:00:00",
@@ -246,7 +247,7 @@ def test_timeseries_derived_column() -> None:
     data = rv.get_json()
     assert rv.status_code == 200
     rows = data["rows"]
-    assert all(r[2] == r[1] * 2 for r in rows)
+    assert all(r[3] == r[2] * 2 for r in rows)
 
 
 def test_reserved_word_column() -> None:
@@ -265,3 +266,68 @@ def test_reserved_word_column() -> None:
     assert rv.status_code == 200
     assert len(data["rows"]) == 2
     assert data["rows"][0][1] == "x"
+
+
+def test_order_by_samples_table() -> None:
+    app = server.app
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
+        "order_by": "Samples",
+        "order_dir": "DESC",
+        "limit": 10,
+        "columns": [],
+        "group_by": ["user"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert 'ORDER BY "Hits" DESC' in data["sql"]
+
+
+def test_order_by_samples_timeseries() -> None:
+    app = server.app
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "order_by": "Samples",
+        "order_dir": "DESC",
+        "x_axis": "timestamp",
+        "granularity": "1 day",
+        "columns": [],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert 'ORDER BY "Hits" DESC' in data["sql"]
+
+
+def test_show_hits_client_side() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "table",
+        "columns": ["value"],
+        "group_by": ["user"],
+        "aggregate": "Sum",
+        "show_hits": False,
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert "count(*) AS Hits" in data["sql"]

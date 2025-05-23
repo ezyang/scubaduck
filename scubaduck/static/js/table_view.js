@@ -123,6 +123,15 @@ function handleSort(e) {
 
 function showResults(data) {
   window.lastResults = data;
+  const hideHits =
+    (graphTypeSel.value === "table" || graphTypeSel.value === "timeseries") &&
+    !document.getElementById("show_hits").checked;
+  if (hideHits && data.rows.length) {
+    const groupCount =
+      (graphTypeSel.value === "timeseries" ? 1 : 0) +
+      ((groupBy.chips || []).length || 0);
+    data.rows.forEach((r) => r.splice(groupCount, 1));
+  }
   const view = document.getElementById("view");
   if (graphTypeSel.value === "timeseries") {
     showTimeSeries(data);
