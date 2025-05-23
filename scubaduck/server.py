@@ -17,6 +17,11 @@ from dateutil import parser as dtparser
 from flask import Flask, jsonify, request, send_from_directory
 
 
+def _quote(ident: str) -> str:
+    """Return identifier quoted for SQL."""
+    return f'"{ident.replace('"', '""')}"'
+
+
 @dataclass
 class Filter:
     column: str
@@ -160,8 +165,9 @@ def _granularity_seconds(granularity: str, start: str | None, end: str | None) -
 
 def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
     """Return SQL expression for column interpreted as timestamp."""
+    qcol = _quote(col)
     if column_types is None:
-        return col
+        return qcol
     ctype = column_types.get(col, "").upper()
     if not any(t in ctype for t in ["TIMESTAMP", "DATE", "TIME"]):
         if any(
@@ -177,7 +183,7 @@ def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
             ]
         ):
             if unit == "ns":
-                expr = f"CAST({col} AS BIGINT)"
+                expr = f"CAST({qcol} AS BIGINT)"
                 return f"make_timestamp_ns({expr})"
 
             multiplier = {
@@ -186,12 +192,12 @@ def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
                 "us": 1,
             }.get(unit, 1_000_000)
             expr = (
-                f"CAST({col} * {multiplier} AS BIGINT)"
+                f"CAST({qcol} * {multiplier} AS BIGINT)"
                 if multiplier != 1
-                else f"CAST({col} AS BIGINT)"
+                else f"CAST({qcol} AS BIGINT)"
             )
             return f"make_timestamp({expr})"
-    return col
+    return qcol
 
 
 def build_query(params: QueryParams, column_types: Dict[str, str] | None = None) -> str:
@@ -220,14 +226,14 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         select_cols = (
             group_cols[1:] if params.graph_type == "timeseries" else group_cols
         )
-        select_parts.extend(select_cols)
+        select_parts.extend(_quote(c) for c in select_cols)
         agg = (params.aggregate or "count").lower()
 
         def agg_expr(col: str) -> str:
-            expr = col
+            expr = _quote(col)
             ctype = column_types.get(col, "").upper() if column_types else ""
             if "BOOL" in ctype:
-                expr = f"CAST({col} AS BIGINT)"
+                expr = f"CAST({_quote(col)} AS BIGINT)"
             if agg.startswith("p"):
                 quant = float(agg[1:]) / 100
                 return f"quantile({expr}, {quant})"
@@ -237,7 +243,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
                 if "TIMESTAMP" in ctype or "DATE" in ctype or "TIME" in ctype:
                     return (
                         "TIMESTAMP 'epoch' + INTERVAL '1 second' * "
-                        f"CAST(avg(epoch({col})) AS BIGINT)"
+                        f"CAST(avg(epoch({_quote(col)})) AS BIGINT)"
                     )
             return f"{agg}({expr})"
 
@@ -247,11 +253,11 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             for col in params.columns:
                 if col in group_cols:
                     continue
-                select_parts.append(f"{agg_expr(col)} AS {col}")
+                select_parts.append(f"{agg_expr(col)} AS {_quote(col)}")
         if params.show_hits:
             select_parts.insert(len(group_cols), "count(*) AS Hits")
     else:
-        select_parts.extend(params.columns)
+        select_parts.extend(_quote(c) for c in params.columns)
 
     if has_agg and params.derived_columns:
         inner_params = replace(
@@ -272,7 +278,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             ") t",
         ]
         if params.order_by:
-            lines.append(f"ORDER BY {params.order_by} {params.order_dir}")
+            lines.append(f"ORDER BY {_quote(params.order_by)} {params.order_dir}")
         elif params.graph_type == "timeseries":
             lines.append("ORDER BY bucket")
         if params.limit is not None:
@@ -303,27 +309,29 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
                 if not f.value:
                     continue
                 if op == "=":
-                    vals = " OR ".join(f"{f.column} = '{v}'" for v in f.value)
+                    qcol = _quote(f.column)
+                    vals = " OR ".join(f"{qcol} = '{v}'" for v in f.value)
                     where_parts.append(f"({vals})")
                     continue
             val = f"'{f.value}'" if isinstance(f.value, str) else str(f.value)
 
+        qcol = _quote(f.column)
         if op == "contains":
-            where_parts.append(f"{f.column} ILIKE '%' || {val} || '%'")
+            where_parts.append(f"{qcol} ILIKE '%' || {val} || '%'")
         elif op == "!contains":
-            where_parts.append(f"{f.column} NOT ILIKE '%' || {val} || '%'")
+            where_parts.append(f"{qcol} NOT ILIKE '%' || {val} || '%'")
         elif op == "empty":
-            where_parts.append(f"{f.column} = {val}")
+            where_parts.append(f"{qcol} = {val}")
         elif op == "!empty":
-            where_parts.append(f"{f.column} != {val}")
+            where_parts.append(f"{qcol} != {val}")
         else:
-            where_parts.append(f"{f.column} {op} {val}")
+            where_parts.append(f"{qcol} {op} {val}")
     if where_parts:
         lines.append("WHERE " + " AND ".join(where_parts))
     if group_cols:
-        lines.append("GROUP BY " + ", ".join(group_cols))
+        lines.append("GROUP BY " + ", ".join(_quote(c) for c in group_cols))
     if params.order_by:
-        lines.append(f"ORDER BY {params.order_by} {params.order_dir}")
+        lines.append(f"ORDER BY {_quote(params.order_by)} {params.order_dir}")
     elif params.graph_type == "timeseries":
         lines.append("ORDER BY bucket")
     if params.limit is not None:
@@ -413,8 +421,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         cached = _cache_get(key)
         if cached is not None:
             return jsonify(cached)
+        qcol = _quote(column)
         rows = con.execute(
-            f"SELECT DISTINCT {column} FROM \"{table}\" WHERE CAST({column} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
+            f"SELECT DISTINCT {qcol} FROM \"{table}\" WHERE CAST({qcol} AS VARCHAR) ILIKE '%' || ? || '%' LIMIT 20",
             [substr],
         ).fetchall()
         values = [r[0] for r in rows]
@@ -560,10 +569,11 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             params.x_axis or params.time_column
         ):
             axis = params.x_axis or params.time_column
+            assert axis is not None
             row = cast(
                 tuple[datetime | None, datetime | None],
                 con.execute(
-                    f'SELECT min({axis}), max({axis}) FROM "{params.table}"'
+                    f'SELECT min({_quote(axis)}), max({_quote(axis)}) FROM "{params.table}"'
                 ).fetchall()[0],
             )
             mn, mx = row

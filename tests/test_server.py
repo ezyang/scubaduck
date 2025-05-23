@@ -827,3 +827,21 @@ def test_time_column_none_no_time_filter() -> None:
     assert rv.status_code == 200
     assert "start" not in data and "end" not in data
     assert len(data["rows"]) == 4
+
+
+def test_reserved_word_column() -> None:
+    app = server.create_app("TEST")
+    client = app.test_client()
+    payload = {
+        "table": "extra",
+        "columns": ["ts", "desc"],
+        "order_by": "ts",
+        "time_column": "",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 2
+    assert data["rows"][0][1] == "x"
