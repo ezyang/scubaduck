@@ -154,6 +154,30 @@ def test_timeseries_limit_applies_to_series() -> None:
     assert all(r[1] == "alice" for r in data["rows"])
 
 
+def test_timeseries_sparse_limit_filtering() -> None:
+    app = server.app
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "events",
+        "start": "2024-01-01 00:00:00",
+        "end": "2024-01-03 00:00:00",
+        "graph_type": "timeseries",
+        "limit": 2,
+        "group_by": ["user"],
+        "columns": ["value"],
+        "x_axis": "timestamp",
+        "granularity": "1 day",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert len(data["rows"]) == 3
+    users = {r[1] for r in data["rows"]}
+    assert users == {"alice", "bob"}
+
+
 def test_timeseries_auto_and_fine_buckets() -> None:
     app = server.app
     client = app.test_client()

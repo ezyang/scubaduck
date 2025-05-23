@@ -681,6 +681,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 )
 
         bucket_size: int | None = None
+        series_limit = params.limit
         if params.graph_type == "timeseries":
             bucket_size = _granularity_seconds(
                 params.granularity,
@@ -720,6 +721,24 @@ def create_app(db_file: str | Path | None = None) -> Flask:
             return value
 
         rows = [[_serialize(v) for v in r] for r in rows]
+
+        if (
+            params.graph_type == "timeseries"
+            and params.group_by
+            and series_limit is not None
+        ):
+            key_slice = slice(1, 1 + len(params.group_by))
+            kept: set[tuple[Any, ...]] = set()
+            filtered: list[list[Any]] = []
+            for row in rows:
+                key = tuple(row[key_slice])
+                if key not in kept:
+                    if len(kept) >= series_limit:
+                        continue
+                    kept.add(key)
+                filtered.append(row)
+            rows = filtered
+
         result: Dict[str, Any] = {"sql": sql, "rows": rows}
         if params.start is not None:
             result["start"] = str(params.start)
