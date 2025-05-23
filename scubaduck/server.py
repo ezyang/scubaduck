@@ -129,6 +129,30 @@ def parse_time(val: str | None) -> str | None:
     return dt.replace(microsecond=0, tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _numeric_to_datetime(value: int | float, unit: str) -> datetime:
+    """Convert a numeric timestamp ``value`` with unit ``unit`` to ``datetime``.
+
+    Heuristically fall back to seconds when the converted value is before 1990
+    but the seconds interpretation is in a reasonable range.  This handles
+    integer columns stored in seconds even when ``unit`` is mistakenly set to a
+    finer granularity.
+    """
+
+    divisor = {
+        "s": 1,
+        "ms": 1000,
+        "us": 1_000_000,
+        "ns": 1_000_000_000,
+    }.get(unit, 1)
+
+    dt = datetime.fromtimestamp(int(value) / divisor, tz=timezone.utc)
+    if unit != "s" and dt.year < 1990:
+        alt = datetime.fromtimestamp(int(value), tz=timezone.utc)
+        if alt.year >= 1990:
+            dt = alt
+    return dt
+
+
 def _granularity_seconds(granularity: str, start: str | None, end: str | None) -> int:
     gran = granularity.lower()
     mapping = {
@@ -183,19 +207,29 @@ def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
             ]
         ):
             if unit == "ns":
-                expr = f"CAST({qcol} AS BIGINT)"
-                return f"make_timestamp_ns({expr})"
+                # Use nanosecond helper unless column cannot represent such large values
+                if "INT" in ctype and "BIGINT" not in ctype and "HUGEINT" not in ctype:
+                    unit = "s"
+                else:
+                    expr = f"CAST({qcol} AS BIGINT)"
+                    return f"make_timestamp_ns({expr})"
+
+            if (
+                unit != "s"
+                and "INT" in ctype
+                and "BIGINT" not in ctype
+                and "HUGEINT" not in ctype
+            ):
+                # 32-bit integers cannot store sub-second precision for modern dates
+                unit = "s"
 
             multiplier = {
                 "s": 1_000_000,
                 "ms": 1_000,
                 "us": 1,
             }.get(unit, 1_000_000)
-            expr = (
-                f"CAST({qcol} * {multiplier} AS BIGINT)"
-                if multiplier != 1
-                else f"CAST({qcol} AS BIGINT)"
-            )
+            base = f"CAST({qcol} AS BIGINT)"
+            expr = f"CAST({base} * {multiplier} AS BIGINT)" if multiplier != 1 else base
             return f"make_timestamp({expr})"
     return qcol
 
@@ -587,15 +621,9 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 ).fetchall()[0],
             )
             mn, mx = row
-            divisor = {
-                "s": 1,
-                "ms": 1000,
-                "us": 1_000_000,
-                "ns": 1_000_000_000,
-            }.get(params.time_unit, 1)
             if isinstance(mn, (int, float)):
                 try:
-                    mn = datetime.fromtimestamp(int(mn) / divisor, tz=timezone.utc)
+                    mn = _numeric_to_datetime(mn, params.time_unit)
                 except Exception:
                     return (
                         jsonify(
@@ -610,7 +638,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                     )
             if isinstance(mx, (int, float)):
                 try:
-                    mx = datetime.fromtimestamp(int(mx) / divisor, tz=timezone.utc)
+                    mx = _numeric_to_datetime(mx, params.time_unit)
                 except Exception:
                     return (
                         jsonify(
