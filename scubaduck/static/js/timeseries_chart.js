@@ -418,11 +418,12 @@ function showTimeSeries(data) {
       line.setAttribute('stroke', '#888');
       axis.appendChild(line);
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const labelY = rotate ? height - 25 : height - 10;
       text.setAttribute('x', x);
-      text.setAttribute('y', height - 10);
+      text.setAttribute('y', labelY);
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('class', 'tick-label' + (rotate ? ' rotated' : ''));
-      if (rotate) text.setAttribute('transform', `rotate(-45 ${x} ${height - 10})`);
+      if (rotate) text.setAttribute('transform', `rotate(-45 ${x} ${labelY})`);
       text.textContent = fmt(new Date(t), lu);
       axis.appendChild(text);
     });

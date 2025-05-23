@@ -397,6 +397,30 @@ def test_timeseries_group_links(page: Any, server_url: str) -> None:
     assert page.is_visible("#legend .drill-links a:text('Aggregate')")
 
 
+def test_timeseries_rotated_day_labels_padding(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.check("#column_groups input[value='value']")
+    page.click("text=View Settings")
+    page.fill("#start", "2024-01-01 00:00:00")
+    page.fill("#end", "2024-01-16 00:00:00")
+    select_value(page, "#granularity", "1 day")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart text.tick-label", state="attached")
+    assert page.eval_on_selector_all(
+        "#chart text.tick-label.rotated", "els => els.length"
+    )
+    overflow = page.eval_on_selector(
+        "#chart",
+        "el => {const r=el.getBoundingClientRect(); return Array.from(el.querySelectorAll('text.tick-label')).some(t => t.getBoundingClientRect().bottom > r.bottom);}",
+    )
+    assert not overflow
+
+
 def test_timeseries_count_no_columns_numeric_time(
     page: Any, test_dataset_server_url: str
 ) -> None:
