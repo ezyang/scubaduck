@@ -352,6 +352,7 @@
 </div>
 <script src="/js/chip_input.js"></script>
 <script src="/js/timeseries_chart.js"></script>
+<script src="/js/time_column.js"></script>
 <script src="/js/sidebar.js"></script>
 <script>
 const allColumns = [];
@@ -580,8 +581,6 @@ function loadColumns(table) {
       integer: {name: 'Integers', cols: [], ul: null},
       string: {name: 'Strings', cols: [], ul: null},
     };
-    const heur = ['timestamp','created','created_at','event_time','time','date','occurred','happened','logged'];
-    let guess = null;
     cols.forEach(c => {
       const t = c.type.toUpperCase();
       columnTypes[c.name] = c.type;
@@ -593,7 +592,6 @@ function loadColumns(table) {
       if (isNumeric || isTimeType) {
         timeColumnOptions.push(c.name);
         baseTimeColumnOptions.push(c.name);
-        if (!guess && heur.some(h => c.name.toLowerCase().includes(h))) guess = c.name;
       }
       if (isTimeType) {
         g = 'time';
@@ -630,7 +628,7 @@ function loadColumns(table) {
       timeColumnSelect.appendChild(o);
     });
     xAxisSelect.value = '';
-    defaultTimeColumn = guess || timeColumnOptions[0] || '';
+    defaultTimeColumn = guessTimeColumn(cols) || '';
     updateTimeFieldVisibility();
     Object.keys(groups).forEach(key => {
       const g = groups[key];
