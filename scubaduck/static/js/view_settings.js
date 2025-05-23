@@ -182,6 +182,7 @@ function updateTimeFieldVisibility() {
   document.getElementById('end').closest('.field').style.display = show
     ? 'flex'
     : 'none';
+  document.getElementById('time_unit').style.display = show ? '' : 'none';
 }
 orderDirBtn.addEventListener('click', () => {
   orderDir = orderDir === 'ASC' ? 'DESC' : 'ASC';
