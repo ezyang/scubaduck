@@ -101,6 +101,20 @@ def test_table_selector_dropdown(page: Any, server_url: str) -> None:
     assert page.query_selector("#table + .dropdown-display + .dropdown-menu input")
 
 
+def test_dropdown_scroll_to_selected(page: Any, server_url: str) -> None:
+    page.goto(server_url)
+    page.wait_for_selector("#table option", state="attached")
+    page.evaluate(
+        "() => { const sel=document.getElementById('table'); for(let i=0;i<30;i++){const o=document.createElement('option'); o.value='t'+i; o.textContent='Table '+i; sel.appendChild(o);} setSelectValue(sel,'t25'); }"
+    )
+    page.click("#table + .dropdown-display")
+    page.wait_for_selector("#table + .dropdown-display + .dropdown-menu div.selected")
+    scroll_top = page.evaluate(
+        "document.querySelector('#table + .dropdown-display + .dropdown-menu').scrollTop"
+    )
+    assert scroll_top > 0
+
+
 def test_x_axis_default_entry(page: Any, server_url: str) -> None:
     page.goto(server_url)
     page.wait_for_selector("#graph_type", state="attached")
