@@ -77,6 +77,11 @@ function initDropdown(select) {
   function open() {
     renderOptions();
     menu.style.display = 'block';
+    const selected = list.querySelector('.selected');
+    if (selected) {
+      const offset = selected.offsetTop - search.offsetHeight - 4;
+      menu.scrollTop = offset > 0 ? offset : 0;
+    }
     search.focus();
   }
 
