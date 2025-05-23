@@ -62,7 +62,7 @@ def test_table_unknown_column_error() -> None:
     rv = client.post(
         "/api/query", data=json.dumps(payload), content_type="application/json"
     )
-    _ = rv.get_json()
+    _data = rv.get_json()
     assert rv.status_code == 200
 
 

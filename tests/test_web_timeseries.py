@@ -3,6 +3,25 @@ from __future__ import annotations
 from typing import Any
 
 from tests.web_utils import select_value
+from collections.abc import Iterator
+import threading
+import pytest
+from werkzeug.serving import make_server
+from scubaduck.server import create_app
+
+
+@pytest.fixture()
+def test_dataset_server_url() -> Iterator[str]:
+    app = create_app("TEST")
+    httpd = make_server("127.0.0.1", 0, app)
+    port = httpd.server_port
+    thread = threading.Thread(target=httpd.serve_forever)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        httpd.shutdown()
+        thread.join()
 
 
 def test_timeseries_default_query(page: Any, server_url: str) -> None:
@@ -400,3 +419,23 @@ def test_timeseries_rotated_day_labels_padding(page: Any, server_url: str) -> No
         "el => {const r=el.getBoundingClientRect(); return Array.from(el.querySelectorAll('text.tick-label')).some(t => t.getBoundingClientRect().bottom > r.bottom);}",
     )
     assert not overflow
+
+
+def test_timeseries_count_no_columns_numeric_time(
+    page: Any, test_dataset_server_url: str
+) -> None:
+    page.goto(test_dataset_server_url)
+    page.wait_for_selector("#graph_type", state="attached")
+    select_value(page, "#graph_type", "timeseries")
+    page.click("text=Columns")
+    page.click("#columns_none")
+    page.click("text=View Settings")
+    select_value(page, "#time_column", "ts")
+    select_value(page, "#time_unit", "s")
+    select_value(page, "#aggregate", "Count")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    page.wait_for_selector("#chart path", state="attached")
+    series_count = page.eval_on_selector_all("#chart path", "els => els.length")
+    assert series_count == 1

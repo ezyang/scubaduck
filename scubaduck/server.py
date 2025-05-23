@@ -711,6 +711,12 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                 400,
             )
 
+        def _serialize(value: Any) -> Any:
+            if isinstance(value, bytes):
+                return repr(value)
+            return value
+
+        rows = [[_serialize(v) for v in r] for r in rows]
         result: Dict[str, Any] = {"sql": sql, "rows": rows}
         if params.start is not None:
             result["start"] = str(params.start)

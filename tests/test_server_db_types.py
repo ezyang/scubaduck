@@ -121,6 +121,34 @@ def test_sqlite_bigint(tmp_path: Path) -> None:
     assert data["rows"][0][1] == big_value
 
 
+def test_sqlite_bytes(tmp_path: Path) -> None:
+    sqlite_file = tmp_path / "bin.sqlite"
+    import sqlite3
+
+    conn = sqlite3.connect(sqlite_file)
+    conn.execute("CREATE TABLE events (timestamp TEXT, data BLOB)")
+    conn.execute(
+        "INSERT INTO events VALUES ('2024-01-01 00:00:00', ?)",
+        (b"\x00\xff",),
+    )
+    conn.commit()
+    conn.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    app = server.create_app(sqlite_file)
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "order_by": "timestamp",
+        "columns": ["timestamp", "data"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["rows"] == [["2024-01-01 00:00:00", "b'\\x00\\xff'"]]
+
+
 def test_sqlite_boolean_aggregation(tmp_path: Path) -> None:
     sqlite_file = tmp_path / "bool.sqlite"
     import sqlite3
