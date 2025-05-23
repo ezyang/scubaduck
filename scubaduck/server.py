@@ -82,13 +82,13 @@ def _create_test_database() -> duckdb.DuckDBPyConnection:
     """Return a DuckDB connection with a small multi-table dataset."""
     con = duckdb.connect()
     con.execute(
-        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, val REAL, name TEXT, flag BOOLEAN)"
+        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts INTEGER, val REAL, name TEXT, flag BOOLEAN)"
     )
-    con.execute("INSERT INTO events VALUES (1, '2024-01-01 00:00:00', 1.5, 'alice', 1)")
-    con.execute("INSERT INTO events VALUES (2, '2024-01-01 01:00:00', 2.0, 'bob', 0)")
-    con.execute('CREATE TABLE extra (ts TEXT, "desc" TEXT, num INTEGER)')
-    con.execute("INSERT INTO extra VALUES ('2024-01-01 00:00:00', 'x', 1)")
-    con.execute("INSERT INTO extra VALUES ('2024-01-01 01:00:00', 'y', 2)")
+    con.execute("INSERT INTO events VALUES (1, 1704067200, 1.5, 'alice', 1)")
+    con.execute("INSERT INTO events VALUES (2, 1704070800, 2.0, 'bob', 0)")
+    con.execute('CREATE TABLE extra (ts INTEGER, "desc" TEXT, num INTEGER)')
+    con.execute("INSERT INTO extra VALUES (1704067200, 'x', 1)")
+    con.execute("INSERT INTO extra VALUES (1704070800, 'y', 2)")
     return con
 
 
