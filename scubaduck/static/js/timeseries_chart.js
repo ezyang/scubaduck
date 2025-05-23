@@ -35,7 +35,13 @@ function showTimeSeries(data) {
   const start = data.start ? parseTs(data.start) : null;
   const end = data.end ? parseTs(data.end) : null;
   const startIdx = 1 + groups.length + hasHits;
-  const valueCols = selectedColumns.slice(groups.length + hasHits);
+  let valueCols = selectedColumns.slice(groups.length + hasHits);
+  if (
+    valueCols.length === 0 &&
+    document.getElementById('aggregate').value.toLowerCase() === 'count'
+  ) {
+    valueCols = ['Count'];
+  }
   const series = {};
   data.rows.forEach(r => {
     const ts = parseTs(r[0]);
