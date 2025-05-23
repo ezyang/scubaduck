@@ -62,6 +62,11 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
         con.execute(
             f"CREATE TABLE events AS SELECT * FROM read_csv_auto('{path.as_posix()}')"
         )
+    elif ext in {".parquet", ".parq"}:
+        con = duckdb.connect()
+        con.execute(
+            f"CREATE TABLE events AS SELECT * FROM read_parquet('{path.as_posix()}')"
+        )
     elif ext in {".db", ".sqlite"}:
         con = duckdb.connect()
         con.execute("LOAD sqlite")

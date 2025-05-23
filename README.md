@@ -55,7 +55,7 @@ uv sync --frozen
 SCUBADUCK_DB=/path/to/foo.sqlite flask --app scubaduck.server run --debug
 ```
 
-DuckDB databases work too.  Omit to get a simple test dataset, or
+DuckDB databases and Parquet files work too.  Omit to get a simple test dataset, or
 `SCUBADUCK_DB=TEST` for a more complicated test dataset.
 
 ## How to use it

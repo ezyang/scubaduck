@@ -227,6 +227,26 @@ def test_envvar_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert len(rows) == 1
 
 
+def test_envvar_parquet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    parquet_file = tmp_path / "events.parquet"
+    con = duckdb.connect()
+    csv_path = Path("scubaduck/sample.csv").resolve()
+    con.execute(
+        f"COPY (SELECT * FROM read_csv_auto('{csv_path.as_posix()}')) TO '{parquet_file.as_posix()}' (FORMAT PARQUET)"
+    )
+    con.close()  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+
+    monkeypatch.setenv("SCUBADUCK_DB", str(parquet_file))
+    app = server.create_app()
+    client = app.test_client()
+    payload = _make_payload()
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    rows = rv.get_json()["rows"]
+    assert len(rows) == 3
+
+
 def test_envvar_db_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     missing = tmp_path / "missing.sqlite"
     monkeypatch.setenv("SCUBADUCK_DB", str(missing))
