@@ -1,6 +1,4 @@
-import sqlite3
 import threading
-from pathlib import Path
 from collections.abc import Iterator
 from typing import Any
 
@@ -12,23 +10,8 @@ from tests.test_web import select_value
 
 
 @pytest.fixture()
-def multi_table_server_url(tmp_path: Path) -> Iterator[str]:
-    db_path = tmp_path / "complex.sqlite"
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, val REAL, name TEXT, flag BOOLEAN)"
-    )
-    conn.execute(
-        "INSERT INTO events VALUES (1, '2024-01-01 00:00:00', 1.5, 'alice', 1)"
-    )
-    conn.execute("INSERT INTO events VALUES (2, '2024-01-01 01:00:00', 2.0, 'bob', 0)")
-    conn.execute("CREATE TABLE extra (ts TEXT, desc TEXT, num INTEGER)")
-    conn.execute("INSERT INTO extra VALUES ('2024-01-01 00:00:00', 'x', 1)")
-    conn.execute("INSERT INTO extra VALUES ('2024-01-01 01:00:00', 'y', 2)")
-    conn.commit()
-    conn.close()
-
-    app = create_app(db_path)
+def multi_table_server_url() -> Iterator[str]:
+    app = create_app("TEST")
     httpd = make_server("127.0.0.1", 0, app)
     port = httpd.server_port
     thread = threading.Thread(target=httpd.serve_forever)

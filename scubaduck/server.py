@@ -73,6 +73,20 @@ def _load_database(path: Path) -> duckdb.DuckDBPyConnection:
     return con
 
 
+def _create_test_database() -> duckdb.DuckDBPyConnection:
+    """Return a DuckDB connection with a small multi-table dataset."""
+    con = duckdb.connect()
+    con.execute(
+        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, val REAL, name TEXT, flag BOOLEAN)"
+    )
+    con.execute("INSERT INTO events VALUES (1, '2024-01-01 00:00:00', 1.5, 'alice', 1)")
+    con.execute("INSERT INTO events VALUES (2, '2024-01-01 01:00:00', 2.0, 'bob', 0)")
+    con.execute('CREATE TABLE extra (ts TEXT, "desc" TEXT, num INTEGER)')
+    con.execute("INSERT INTO extra VALUES ('2024-01-01 00:00:00', 'x', 1)")
+    con.execute("INSERT INTO extra VALUES ('2024-01-01 01:00:00', 'y', 2)")
+    return con
+
+
 _REL_RE = re.compile(
     r"([+-]?\d+(?:\.\d*)?)\s*(hour|hours|day|days|week|weeks|fortnight|fortnights)",
     re.IGNORECASE,
@@ -323,8 +337,11 @@ def create_app(db_file: str | Path | None = None) -> Flask:
         env_db = os.environ.get("SCUBADUCK_DB")
         if env_db:
             db_file = env_db
-    db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
-    con = _load_database(db_path)
+    if isinstance(db_file, str) and db_file.upper() == "TEST":
+        con = _create_test_database()
+    else:
+        db_path = Path(db_file or Path(__file__).with_name("sample.csv")).resolve()
+        con = _load_database(db_path)
     tables = [r[0] for r in con.execute("SHOW TABLES").fetchall()]
     if not tables:
         raise ValueError("No tables found in database")
