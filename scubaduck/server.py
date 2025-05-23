@@ -544,7 +544,7 @@ def create_app(db_file: str | Path | None = None) -> Flask:
                     if c not in column_types:
                         continue
                     ctype = column_types.get(c, "").upper()
-                    is_numeric = any(
+                    is_numeric = "BOOL" in ctype or any(
                         t in ctype
                         for t in [
                             "INT",
