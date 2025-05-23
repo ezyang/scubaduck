@@ -203,6 +203,7 @@ def _time_expr(col: str, column_types: Dict[str, str] | None, unit: str) -> str:
 def build_query(params: QueryParams, column_types: Dict[str, str] | None = None) -> str:
     select_parts: list[str] = []
     group_cols = params.group_by[:]
+    selected_for_order = set(params.columns) | set(params.derived_columns.keys())
     if params.graph_type == "timeseries":
         sec = _granularity_seconds(params.granularity, params.start, params.end)
         x_axis = params.x_axis or params.time_column
@@ -221,6 +222,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             )
         select_parts.append(f"{bucket_expr} AS bucket")
         group_cols = ["bucket"] + group_cols
+        selected_for_order.add("bucket")
     has_agg = bool(group_cols) or params.aggregate is not None
     if has_agg:
         select_cols = (
@@ -228,6 +230,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         )
         select_parts.extend(_quote(c) for c in select_cols)
         agg = (params.aggregate or "count").lower()
+        selected_for_order.update(group_cols)
 
         def agg_expr(col: str) -> str:
             expr = _quote(col)
@@ -249,15 +252,21 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
 
         if agg == "count":
             select_parts.append("count(*) AS Count")
+            selected_for_order.add("Count")
         else:
             for col in params.columns:
                 if col in group_cols:
                     continue
                 select_parts.append(f"{agg_expr(col)} AS {_quote(col)}")
+                selected_for_order.add(col)
         if params.show_hits:
             select_parts.insert(len(group_cols), "count(*) AS Hits")
+            selected_for_order.add("Hits")
     else:
         select_parts.extend(_quote(c) for c in params.columns)
+        selected_for_order.update(params.columns)
+
+    order_by = params.order_by if params.order_by in selected_for_order else None
 
     if has_agg and params.derived_columns:
         inner_params = replace(
@@ -277,8 +286,8 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             indented_inner,
             ") t",
         ]
-        if params.order_by:
-            lines.append(f"ORDER BY {_quote(params.order_by)} {params.order_dir}")
+        if order_by:
+            lines.append(f"ORDER BY {_quote(order_by)} {params.order_dir}")
         elif params.graph_type == "timeseries":
             lines.append("ORDER BY bucket")
         if params.limit is not None:
@@ -287,6 +296,7 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
 
     for name, expr in params.derived_columns.items():
         select_parts.append(f"{expr} AS {name}")
+        selected_for_order.add(name)
     select_clause = ", ".join(select_parts) if select_parts else "*"
     lines = [f"SELECT {select_clause}", f'FROM "{params.table}"']
     where_parts: list[str] = []
@@ -330,8 +340,8 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
         lines.append("WHERE " + " AND ".join(where_parts))
     if group_cols:
         lines.append("GROUP BY " + ", ".join(_quote(c) for c in group_cols))
-    if params.order_by:
-        lines.append(f"ORDER BY {_quote(params.order_by)} {params.order_dir}")
+    if order_by:
+        lines.append(f"ORDER BY {_quote(order_by)} {params.order_dir}")
     elif params.graph_type == "timeseries":
         lines.append("ORDER BY bucket")
     if params.limit is not None:

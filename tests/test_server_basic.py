@@ -148,3 +148,19 @@ def test_string_filter_ops() -> None:
         "/api/query", data=json.dumps(not_empty), content_type="application/json"
     )
     assert len(rv.get_json()["rows"]) == 4
+
+
+def test_order_by_ignored_when_not_selected() -> None:
+    app = server.app
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "order_by": "value",
+        "columns": ["timestamp"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert "ORDER BY" not in data["sql"]
