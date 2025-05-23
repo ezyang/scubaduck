@@ -6,7 +6,7 @@ import pytest
 from werkzeug.serving import make_server
 
 from scubaduck.server import create_app
-from tests.test_web import select_value
+from tests.web_utils import select_value
 
 
 @pytest.fixture()
