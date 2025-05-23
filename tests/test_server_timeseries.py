@@ -265,3 +265,22 @@ def test_reserved_word_column() -> None:
     assert rv.status_code == 200
     assert len(data["rows"]) == 2
     assert data["rows"][0][1] == "x"
+
+
+def test_count_group_by_num_no_extra_column() -> None:
+    app = server.create_app("TEST")
+    client = app.test_client()
+    payload: dict[str, Any] = {
+        "table": "extra",
+        "graph_type": "table",
+        "group_by": ["num"],
+        "aggregate": "Count",
+        "columns": [],
+        "time_column": "",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert all(len(row) == 2 for row in data["rows"])

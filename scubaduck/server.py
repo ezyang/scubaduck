@@ -296,15 +296,20 @@ def build_query(params: QueryParams, column_types: Dict[str, str] | None = None)
             return f"{agg}({expr})"
 
         if agg == "count":
-            select_parts.append("count(*) AS Count")
-            selected_for_order.add("Count")
+            if params.graph_type == "table":
+                col_name = "Hits" if params.show_hits else "Count"
+                select_parts.append(f"count(*) AS {col_name}")
+                selected_for_order.add(col_name)
+            else:
+                select_parts.append("count(*) AS Count")
+                selected_for_order.add("Count")
         else:
             for col in params.columns:
                 if col in group_cols:
                     continue
                 select_parts.append(f"{agg_expr(col)} AS {_quote(col)}")
                 selected_for_order.add(col)
-        if params.show_hits:
+        if params.show_hits and (agg != "count" or params.graph_type == "timeseries"):
             select_parts.insert(len(group_cols), "count(*) AS Hits")
             selected_for_order.add("Hits")
     else:
