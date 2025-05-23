@@ -163,6 +163,38 @@ def test_relative_time_query(monkeypatch: pytest.MonkeyPatch) -> None:
     assert data["rows"][0][3] == "charlie"
 
 
+def test_relative_month_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = server.app
+    client = app.test_client()
+
+    from datetime import datetime
+
+    fixed_now = datetime(2024, 1, 2, 0, 0, 0)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(server, "datetime", FixedDateTime)
+
+    payload = {
+        "table": "events",
+        "start": "-1 year",
+        "end": "-1 month",
+        "order_by": "timestamp",
+        "limit": 10,
+        "columns": ["timestamp"],
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["start"] == "2023-01-02 00:00:00"
+    assert data["end"] == "2023-12-02 00:00:00"
+
+
 def test_default_start_end_returned() -> None:
     app = server.app
     client = app.test_client()
