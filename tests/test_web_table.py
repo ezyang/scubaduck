@@ -2,7 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.web_utils import run_query
+from collections.abc import Iterator
+import threading
+
+import pytest
+from werkzeug.serving import make_server
+
+from scubaduck.server import create_app
+from tests.web_utils import run_query, select_value
+
+
+@pytest.fixture()
+def test_dataset_server_url() -> Iterator[str]:
+    app = create_app("TEST")
+    httpd = make_server("127.0.0.1", 0, app)
+    port = httpd.server_port
+    thread = threading.Thread(target=httpd.serve_forever)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        httpd.shutdown()
+        thread.join()
 
 
 def test_table_sorting(page: Any, server_url: str) -> None:
@@ -304,3 +325,27 @@ def test_sql_query_display(page: Any, server_url: str) -> None:
     displayed = page.text_content("#sql_query")
     assert displayed is not None
     assert displayed.strip() == sql
+
+
+def test_table_count_no_columns(page: Any, test_dataset_server_url: str) -> None:
+    page.goto(test_dataset_server_url)
+    page.wait_for_selector("#order_by option", state="attached")
+    select_value(page, "#graph_type", "table")
+    page.click("text=Columns")
+    page.click("#columns_all")
+    page.click("text=View Settings")
+    page.evaluate("groupBy.chips = ['id']; groupBy.renderChips();")
+    select_value(page, "#aggregate", "Count")
+    page.evaluate("window.lastResults = undefined")
+    page.click("text=Dive")
+    page.wait_for_function("window.lastResults !== undefined")
+    headers = page.locator("#results th").all_inner_texts()
+    assert headers == ["id", "Hits"]
+    col_count = page.locator("#results th").count()
+    row_count = page.locator("#results tr").count()
+    assert col_count == 2
+    assert row_count == 3
+    overflow = page.evaluate(
+        "var v=document.getElementById('view'); v.scrollWidth > v.clientWidth"
+    )
+    assert not overflow

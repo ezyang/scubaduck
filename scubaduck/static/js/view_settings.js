@@ -439,12 +439,15 @@ function updateSelectedColumns(type = graphTypeSel.value) {
   if (type === 'table' || type === 'timeseries') {
     selectedColumns = groupBy.chips.slice();
     if (document.getElementById('show_hits').checked) selectedColumns.push('Hits');
-    base.forEach(c => {
-      if (!selectedColumns.includes(c)) selectedColumns.push(c);
-    });
-    derivedColumns.forEach(dc => {
-      if (dc.include && !selectedColumns.includes(dc.name)) selectedColumns.push(dc.name);
-    });
+    const agg = document.getElementById('aggregate').value.toLowerCase();
+    if (!(type === 'table' && agg === 'count')) {
+      base.forEach(c => {
+        if (!selectedColumns.includes(c)) selectedColumns.push(c);
+      });
+      derivedColumns.forEach(dc => {
+        if (dc.include && !selectedColumns.includes(dc.name)) selectedColumns.push(dc.name);
+      });
+    }
   } else {
     selectedColumns = base.slice();
     derivedColumns.forEach(dc => {
