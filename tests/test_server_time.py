@@ -196,3 +196,39 @@ def test_time_column_none_no_time_filter() -> None:
     assert rv.status_code == 200
     assert "start" not in data and "end" not in data
     assert len(data["rows"]) == 4
+
+
+def test_test_dataset_int32_time_s() -> None:
+    app = server.create_app("TEST")
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "time_column": "ts",
+        "time_unit": "s",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["start"] == "2024-01-01 00:00:00"
+    assert data["end"] == "2024-01-01 01:00:00"
+    assert len(data["rows"]) == 2
+
+
+def test_test_dataset_int32_time_us() -> None:
+    app = server.create_app("TEST")
+    client = app.test_client()
+    payload = {
+        "table": "events",
+        "time_column": "ts",
+        "time_unit": "us",
+    }
+    rv = client.post(
+        "/api/query", data=json.dumps(payload), content_type="application/json"
+    )
+    data = rv.get_json()
+    assert rv.status_code == 200
+    assert data["start"] == "2024-01-01 00:00:00"
+    assert data["end"] == "2024-01-01 01:00:00"
+    assert len(data["rows"]) == 2
