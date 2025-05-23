@@ -448,6 +448,9 @@ function updateSelectedColumns(type = graphTypeSel.value) {
         if (dc.include && !selectedColumns.includes(dc.name)) selectedColumns.push(dc.name);
       });
     }
+    if (type === 'timeseries' && agg === 'count' && !selectedColumns.includes('Count')) {
+      selectedColumns.push('Count');
+    }
   } else {
     selectedColumns = base.slice();
     derivedColumns.forEach(dc => {
@@ -692,8 +695,8 @@ function collectParams() {
     order_by: document.getElementById('order_by').value,
     order_dir: orderDir,
     limit: parseInt(document.getElementById('limit').value, 10),
-    columns: selectedColumns.filter(c =>
-      c !== 'Hits' && !derivedColumns.some(dc => dc.name === c)
+    columns: selectedColumns.filter(
+      c => c !== 'Hits' && c !== 'Count' && !derivedColumns.some(dc => dc.name === c)
     ),
     samples_columns: columnValues.samples.slice(),
     table_columns: columnValues.table.slice(),
