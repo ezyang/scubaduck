@@ -9,6 +9,8 @@ but I also think Scuba's UI for doing queries is great and I have found myself
 wishing that I have access to it even for "small" databases, e.g., I have a
 sqlite dataset I want to explore.  ScubaDuck is this interface.
 
+<img width="1369" alt="Image" src="https://github.com/user-attachments/assets/e70cd5c8-e775-44b8-bab3-518a423b2267" />
+
 This application was entirely vibe coded using OpenAI Codex.  It has no
 third-party JS dependencies; everything was coded from scratch.
 
@@ -59,6 +61,13 @@ DuckDB databases and Parquet files work too.  Omit to get a simple test dataset,
 `SCUBADUCK_DB=TEST` for a more complicated test dataset.
 
 ## How to use it
+
+If you don't have a dataset handy,
+[NYC TLC Yellow Taxi Trip Records](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
+has convenient PARQUET files that are time series.  You could for example
+run ScubaDuck on
+[January 2025 Yellow Taxi Trip Records](https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet)
+(which is where the screenshot above was taken from).
 
 After you've loaded a database and navigate to the application, the home page
 will pop up the first table in your database and display a hundred samples
